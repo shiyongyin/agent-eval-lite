@@ -10,7 +10,7 @@
     "seq": { "type": "integer", "minimum": 1 },
     "timestamp": { "type": "string" },
     "type": {
-      "enum": ["run_started", "agent_started", "agent_finished", "tool_call", "shell_command", "submission_received", "submission_invalid", "judge_started", "judge_completed", "feedback_delivered", "stop_hook_triggered", "resume", "error", "usage_recorded", "final_selection", "run_completed"]
+      "enum": ["run_started", "agent_started", "agent_finished", "tool_call", "shell_command", "submission_received", "submission_invalid", "judge_started", "judge_completed", "auto_eval_sampled", "feedback_delivered", "stop_hook_triggered", "resume", "error", "usage_recorded", "final_selection", "run_completed"]
     },
     "attempt_id": { "type": "string" },
     "payload": { "type": "object" }

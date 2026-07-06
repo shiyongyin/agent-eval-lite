@@ -182,6 +182,7 @@ public final class ReportGenerator {
 
         root.set("tool_usage", buildToolUsage(traceEvents, bestSubmission, traceSecret));
         root.set("cost", buildCost(traceEvents, traceSecret));
+        root.set("auto_eval", buildAutoEval(traceEvents, traceSecret));
 
         ObjectNode safety = root.putObject("safety");
         long canaryLeaks = state.attempts().stream()
@@ -295,6 +296,40 @@ public final class ReportGenerator {
         return cost;
     }
 
+    /**
+     * 还原 auto-eval 后台采样轨迹（trace 中的 {@code auto_eval_sampled} 事件）。
+     *
+     * <p>采样分只是「进行中的进度信号」，与正式判分（judge_completed）分属不同口径，
+     * 报告中单列且不参与任何成绩计算。有签名密钥时只统计可核验事件。
+     */
+    private static ObjectNode buildAutoEval(List<JsonNode> traceEvents, byte[] traceSecret) {
+        ObjectNode autoEval = Jsons.json().createObjectNode();
+        ArrayNode samples = Jsons.json().createArrayNode();
+        for (JsonNode event : traceEvents) {
+            if (!"auto_eval_sampled".equals(event.path("type").asText())) {
+                continue;
+            }
+            if (traceSecret != null && !TraceSigner.verify(traceSecret, event)) {
+                continue;
+            }
+            JsonNode payload = event.path("payload");
+            ObjectNode item = samples.addObject();
+            item.put("attempt_id", event.path("attempt_id").asText());
+            item.put("timestamp", event.path("timestamp").asText());
+            if (payload.has("error")) {
+                item.put("error", payload.path("error").asText());
+            } else {
+                item.put("score", payload.path("score").asDouble());
+                item.put("passed", payload.path("passed").asBoolean(false));
+                item.put("has_submission", payload.path("has_submission").asBoolean(false));
+            }
+        }
+        autoEval.put("enabled", !samples.isEmpty());
+        autoEval.put("sample_count", samples.size());
+        autoEval.set("samples", samples);
+        return autoEval;
+    }
+
     // ---------------------------------------------------------------- markdown
 
     private static String renderMarkdown(ObjectNode report) {
@@ -370,6 +405,21 @@ public final class ReportGenerator {
                 sb.append("- 未可信 trace 事件：**").append(usage.path("untrusted_trace_events").asInt())
                         .append("**（未计入工具使用）\n\n");
             }
+        }
+
+        JsonNode autoEval = report.path("auto_eval");
+        if (autoEval.path("enabled").asBoolean(false)) {
+            sb.append("## Auto-eval 采样轨迹（进行中快照，不参与成绩）\n\n");
+            sb.append("| 轮次 | 时间 | 采样分 | 已有提交 |\n|---|---|---|---|\n");
+            for (JsonNode sample : autoEval.path("samples")) {
+                sb.append("| ").append(sample.path("attempt_id").asText())
+                        .append(" | ").append(sample.path("timestamp").asText())
+                        .append(" | ").append(sample.has("error")
+                                ? "采样失败" : String.valueOf(sample.path("score").asDouble()))
+                        .append(" | ").append(sample.path("has_submission").asBoolean(false) ? "是" : "否")
+                        .append(" |\n");
+            }
+            sb.append("\n");
         }
 
         JsonNode cost = report.path("cost");

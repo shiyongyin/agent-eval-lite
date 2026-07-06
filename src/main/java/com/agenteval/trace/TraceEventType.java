@@ -29,6 +29,8 @@ public enum TraceEventType {
     JUDGE_STARTED,
     /** 评审完成（含分数与指纹）。 */
     JUDGE_COMPLETED,
+    /** auto-eval 后台快照采样结果（kind=auto，不回注 Agent，只供轨迹观测）。 */
+    AUTO_EVAL_SAMPLED,
     /** 受控反馈已写出。 */
     FEEDBACK_DELIVERED,
     /** Agent 过早自称完成、被要求继续（轻量 stop hook）。 */

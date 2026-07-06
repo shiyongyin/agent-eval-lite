@@ -192,7 +192,7 @@ public final class RunManager {
         RunStatus terminalStatus = null;
 
         if (spec.runtime().autoEvalIntervalSeconds() > 0) {
-            log.warn("auto_eval_interval_seconds 配置为 {}，Phase 1 未实现后台采样，忽略",
+            log.info("auto-eval 后台采样已启用（间隔 {}s，结果只进 trace/report 轨迹，不回注 Agent）",
                     spec.runtime().autoEvalIntervalSeconds());
         }
 
@@ -217,7 +217,12 @@ public final class RunManager {
             trace.log(TraceEventType.AGENT_STARTED, attemptId, Map.of(
                     "adapter", adapter.name(), "attempt_number", attemptNumber));
             long attemptStart = System.nanoTime();
-            AttemptOutcome outcome = adapter.runAttempt(input);
+            AttemptOutcome outcome;
+            // auto-eval 采样只在 agent 执行窗口内活跃（间隔为 0 时是零开销空操作）。
+            try (AutoEvalSampler sampler = AutoEvalSampler.start(
+                    ctx, trace, state.runId(), attemptId, traceSecret)) {
+                outcome = adapter.runAttempt(input);
+            }
             trace.log(TraceEventType.AGENT_FINISHED, attemptId, Map.of(
                     "exit_code", outcome.exitCode(),
                     "declared_done", outcome.agentDeclaredDone(),
