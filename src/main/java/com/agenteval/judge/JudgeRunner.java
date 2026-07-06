@@ -44,16 +44,19 @@ public final class JudgeRunner {
 
         List<CheckOutcome> outcomes = new ArrayList<>();
         String judgeVersion = "";
+        boolean deterministic = type == JudgeType.RULES;
         if (type == JudgeType.RULES || type == JudgeType.HYBRID) {
             RulesFile rules = RulesFile.load(
                     input.taskDir().resolve(spec.judge().rulesFile()), dimensionNames);
             judgeVersion = rules.judgeVersion();
+            // llm_rubric 属非确定性检查：可复现标注必须如实降级（设计 §5.6）。
+            deterministic = deterministic && !rules.hasNonDeterministicChecks();
             outcomes.addAll(RulesJudge.run(rules, input));
         }
         if (type == JudgeType.SCRIPT || type == JudgeType.HYBRID) {
             outcomes.addAll(ScriptJudge.run(input, dimensionNames));
         }
-        return aggregate(input, outcomes, type, judgeVersion);
+        return aggregate(input, outcomes, type, judgeVersion, deterministic);
     }
 
     /**
@@ -72,7 +75,7 @@ public final class JudgeRunner {
     }
 
     /**
-     * 把检查结论聚合为评分结果（携带规则语义版本）。
+     * 把检查结论聚合为评分结果（携带规则语义版本；确定性按「纯 rules 评审」推断）。
      *
      * @param input 评审输入
      * @param outcomes 全部检查结论
@@ -82,6 +85,21 @@ public final class JudgeRunner {
      */
     public static JudgeResult aggregate(JudgeInput input, List<CheckOutcome> outcomes,
                                         JudgeType type, String judgeVersion) {
+        return aggregate(input, outcomes, type, judgeVersion, type == JudgeType.RULES);
+    }
+
+    /**
+     * 把检查结论聚合为评分结果（显式指定确定性标注）。
+     *
+     * @param input 评审输入
+     * @param outcomes 全部检查结论
+     * @param type 评审类型
+     * @param judgeVersion 规则语义版本（来自 judge.rules.yaml；纯脚本评审可传空串）
+     * @param deterministic 本次评审是否确定性（含 llm_rubric 时必须为 {@code false}）
+     * @return 评分结果
+     */
+    public static JudgeResult aggregate(JudgeInput input, List<CheckOutcome> outcomes,
+                                        JudgeType type, String judgeVersion, boolean deterministic) {
         TaskSpec spec = input.taskSpec();
 
         Map<String, double[]> byDimension = new LinkedHashMap<>();
@@ -134,7 +152,7 @@ public final class JudgeRunner {
                 Hashes.sha256OfFile(input.submissionFile()),
                 Hashes.sha256OfDir(input.workspaceDir()),
                 Instant.now(),
-                type == JudgeType.RULES);
+                deterministic);
 
         return new JudgeResult(1, spec.taskId(), input.runId(), input.attemptId(),
                 type.jsonName(), score, spec.scoring().maxScore(), passed,

@@ -26,13 +26,23 @@ import java.util.Set;
  */
 public record RulesFile(int schemaVersion, String judgeVersion, String canaryToken, List<CheckDef> checks) {
 
-    /** Phase 1 支持的全部 check 类型。 */
+    /** 支持的全部 check 类型（{@code llm_rubric} 为唯一非确定性类型，受低权重与非 blocking 约束）。 */
     public static final Set<String> SUPPORTED_TYPES = Set.of(
             "json_schema", "jsonpath_equals", "jsonpath_exists", "jsonpath_matches",
             "list_coverage", "evidence_sources_valid",
             "workspace_file_exists", "workspace_file_contains", "changed_files_verified",
             "command", "tool_call_required", "tool_call_forbidden", "no_canary_leak",
-            "world_state");
+            "world_state", "llm_rubric");
+
+    /**
+     * 判断规则文件是否包含非确定性检查（当前即 {@code llm_rubric}）——
+     * 决定评分结果 {@code reproducibility.deterministic} 的如实标注。
+     *
+     * @return 含 llm_rubric 检查时为 {@code true}
+     */
+    public boolean hasNonDeterministicChecks() {
+        return checks.stream().anyMatch(c -> "llm_rubric".equals(c.type()));
+    }
 
     public RulesFile {
         checks = checks == null ? List.of() : List.copyOf(checks);

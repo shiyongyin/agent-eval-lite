@@ -87,6 +87,7 @@ public final class RulesJudge {
                 case "tool_call_forbidden" -> toolCallForbidden(def, input);
                 case "world_state" -> worldState(def, input);
                 case "no_canary_leak" -> noCanaryLeak(def, rules, input);
+                case "llm_rubric" -> LlmRubricJudge.run(def, input);
                 default -> throw new JudgeException("未知 check 类型: " + def.type());
             };
         } catch (JudgeException e) {

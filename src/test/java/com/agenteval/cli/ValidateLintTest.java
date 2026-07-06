@@ -102,6 +102,70 @@ class ValidateLintTest {
         assertThat(errors.get(1)).contains("STATE_TOOL_NOT_ALLOWED").contains("不在 allowed_tools");
     }
 
+    @Test
+    void llm_rubric违反低权重与非blocking约束_被静态拦截() throws Exception {
+        Path taskDir = brokenTask("""
+                schema_version: 1
+                judge_version: "0.1.0"
+                checks:
+                  - id: DET_CHECK
+                    type: jsonpath_exists
+                    dimension: correctness
+                    points: 40
+                    path: "$.answer"
+                    feedback_fail: 占位
+                  - id: LLM_TOO_HEAVY
+                    type: llm_rubric
+                    dimension: correctness
+                    points: 60
+                    blocking: true
+                    rubric_file: rubric.md
+                    feedback_fail: 占位
+                  - id: LLM_NO_RUBRIC
+                    type: llm_rubric
+                    dimension: correctness
+                    points: 1
+                    rubric_file: nope.md
+                    feedback_fail: 占位
+                """, List.of());
+        Files.writeString(taskDir.resolve("hidden/rubric.md"), "# rubric\n");
+        TaskSpec spec = TaskSpecLoader.load(taskDir);
+        RulesFile rules = loadRules(spec, taskDir);
+
+        List<String> errors = ValidateCommand.lintRules(spec, taskDir, rules);
+
+        // blocking 禁令 + rubric_file 断链 + 有效权重 (60+1)/101×100≈60.4 > 30 上限。
+        assertThat(errors).hasSize(3);
+        assertThat(errors.get(0)).contains("LLM_TOO_HEAVY").contains("禁止设为 blocking");
+        assertThat(errors.get(1)).contains("LLM_NO_RUBRIC").contains("rubric_file 不存在");
+        assertThat(errors.get(2)).contains("llm_rubric 有效权重").contains("30%");
+    }
+
+    @Test
+    void llm_rubric低权重合规_通过lint() throws Exception {
+        Path taskDir = brokenTask("""
+                schema_version: 1
+                judge_version: "0.1.0"
+                checks:
+                  - id: DET_CHECK
+                    type: jsonpath_exists
+                    dimension: correctness
+                    points: 70
+                    path: "$.answer"
+                    feedback_fail: 占位
+                  - id: LLM_LIGHT
+                    type: llm_rubric
+                    dimension: correctness
+                    points: 30
+                    rubric_file: rubric.md
+                    feedback_fail: 占位
+                """, List.of());
+        Files.writeString(taskDir.resolve("hidden/rubric.md"), "# rubric\n");
+        TaskSpec spec = TaskSpecLoader.load(taskDir);
+
+        assertThat(ValidateCommand.lintRules(spec, taskDir, loadRules(spec, taskDir))).isEmpty();
+    }
+
     // ---------------------------------------------------------------- fixtures
 
     /**

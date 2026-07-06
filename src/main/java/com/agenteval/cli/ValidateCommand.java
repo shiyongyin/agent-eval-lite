@@ -12,7 +12,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
@@ -68,6 +71,16 @@ public final class ValidateCommand implements Callable<Integer> {
                 + "，checks=" + checkCount
                 + "，维度=" + spec.scoring().dimensions().size()
                 + "，通过线=" + spec.scoring().passScore() + "/" + spec.scoring().maxScore() + "）");
+        // 提示（不算失败）：声明了真实后端但还没有 replay 应答库的工具，默认模式下调用会失败。
+        for (TaskSpec.AllowedTool tool : spec.allowedTools()) {
+            if (tool.backend() != null
+                    && !Files.isRegularFile(taskDir.resolve("hidden/tools/" + tool.name() + ".responses.yaml"))) {
+                System.out.println("提示: 工具 " + tool.name()
+                        + " 声明了 http 后端但无 replay 应答库——默认 replay 模式下调用将失败，"
+                        + "请先 AEL_TOOL_MODE=live 录制并把 <run>/tools/" + tool.name()
+                        + ".recorded.yaml 晋升为 hidden/tools/" + tool.name() + ".responses.yaml");
+            }
+        }
         return 0;
     }
 
@@ -111,8 +124,50 @@ public final class ValidateCommand implements Callable<Integer> {
                     }
                 }
             }
+            if ("llm_rubric".equals(check.type())) {
+                String rubricFile = check.raw().path("rubric_file").asText("");
+                if (rubricFile.isBlank()) {
+                    errors.add("check " + check.id() + " 缺少 rubric_file");
+                } else if (!Files.isRegularFile(hiddenDir.resolve(rubricFile))) {
+                    errors.add("check " + check.id() + " 的 rubric_file 不存在: hidden/" + rubricFile);
+                }
+                if (check.blocking()) {
+                    errors.add("check " + check.id()
+                            + " 是 llm_rubric，禁止设为 blocking（非确定性信号不能一票否决）");
+                }
+            }
         }
+        lintLlmWeightShare(spec, rules, errors);
         return errors;
+    }
+
+    /**
+     * llm_rubric 有效权重占比上限（30%）：LLM 是非确定性信号，只允许承担低权重的主观维度
+     * （设计 §5.6）。有效权重 = Σ各维度 [维度权重 × 该维度内 llm 点数占比]。
+     */
+    private static void lintLlmWeightShare(TaskSpec spec, RulesFile rules, List<String> errors) {
+        Map<String, double[]> pointsByDimension = new LinkedHashMap<>();
+        for (RulesFile.CheckDef check : rules.checks()) {
+            double[] acc = pointsByDimension.computeIfAbsent(check.dimension(), k -> new double[2]);
+            acc[0] += check.points();
+            if ("llm_rubric".equals(check.type())) {
+                acc[1] += check.points();
+            }
+        }
+        double llmEffectiveWeight = 0;
+        for (Map.Entry<String, double[]> entry : pointsByDimension.entrySet()) {
+            double total = entry.getValue()[0];
+            double llm = entry.getValue()[1];
+            if (total > 0 && llm > 0) {
+                llmEffectiveWeight += spec.scoring().weightOf(entry.getKey()) * llm / total;
+            }
+        }
+        double cap = spec.scoring().maxScore() * 0.3;
+        if (llmEffectiveWeight > cap + 1e-9) {
+            errors.add(String.format(Locale.ROOT,
+                    "llm_rubric 有效权重 %.1f 超过上限 %.1f（max_score 的 30%%）——"
+                            + "LLM 判分只允许承担低权重主观维度，请下调 points 或维度权重", llmEffectiveWeight, cap));
+        }
     }
 
     private static void lintExpectedFrom(String checkId, String expectedFrom,
