@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.local/schemas/submission.api_payload.schema.json",
+  "title": "API payload 生成任务提交",
+  "type": "object",
+  "required": ["submission_type", "final_payload"],
+  "properties": {
+    "submission_type": { "const": "api_payload" },
+    "final_payload": { "type": "object" }
+  }
+}

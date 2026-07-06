@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.local/schemas/submission.tool_call.schema.json",
+  "title": "工具调用任务提交",
+  "type": "object",
+  "required": ["submission_type", "final_payload", "tool_calls_used", "validation_result"],
+  "properties": {
+    "submission_type": { "const": "tool_call" },
+    "final_payload": { "type": "object" },
+    "tool_calls_used": { "type": "array", "minItems": 1 },
+    "validation_result": { "type": "object" }
+  }
+}

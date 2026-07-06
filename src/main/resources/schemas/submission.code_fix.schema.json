@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.local/schemas/submission.code_fix.schema.json",
+  "title": "代码修改任务提交",
+  "type": "object",
+  "required": ["submission_type", "changed_files", "tests_run"],
+  "properties": {
+    "submission_type": { "const": "code_fix" },
+    "changed_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "change_summary"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "change_summary": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "tests_run": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["command", "result"],
+        "properties": {
+          "command": { "type": "string", "minLength": 1 },
+          "result": { "enum": ["passed", "failed", "not_run"] }
+        }
+      }
+    }
+  }
+}

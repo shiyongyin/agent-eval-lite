@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.local/schemas/submission.envelope.schema.json",
+  "title": "AgentEval-Lite 提交信封",
+  "type": "object",
+  "required": ["schema_version", "task_id", "attempt_id", "submission_type", "summary", "known_risks", "needs_human_review"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "attempt_id": { "type": "string", "pattern": "^attempt_[0-9]{3}$" },
+    "submission_type": { "enum": ["generic", "code_fix", "api_payload", "tool_call", "document", "review"] },
+    "summary": { "type": "string", "minLength": 8 },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "source"],
+        "properties": {
+          "type": { "enum": ["file", "tool_call", "url"] },
+          "source": { "type": "string", "minLength": 1 },
+          "quote_or_ref": { "type": "string" }
+        }
+      }
+    },
+    "tool_calls_used": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "call_id"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "call_id": { "type": "string", "minLength": 1 },
+          "purpose": { "type": "string" }
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "description": "Agent 自报的本轮资源消耗（token/成本；自报口径，仅用于 ROI 对比，不参与评分）",
+      "properties": {
+        "model": { "type": "string" },
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 },
+        "cost_usd": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "known_risks": { "type": "array", "items": { "type": "string" } },
+    "needs_human_review": { "type": "boolean" }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.local/schemas/submission.document.schema.json",
+  "title": "文档 / 分析任务提交",
+  "type": "object",
+  "required": ["submission_type", "deliverable", "sources", "confidence"],
+  "properties": {
+    "submission_type": { "const": "document" },
+    "deliverable": {
+      "type": "object",
+      "required": ["type", "content"],
+      "properties": {
+        "type": { "enum": ["markdown", "json"] },
+        "content": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sources": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.local/schemas/submission.generic.schema.json",
+  "title": "通用任务提交",
+  "type": "object",
+  "required": ["submission_type", "answer"],
+  "properties": {
+    "submission_type": { "const": "generic" },
+    "answer": { "type": "object" }
+  }
+}

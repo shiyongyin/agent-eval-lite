@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.local/schemas/judge.result.schema.json",
+  "title": "Judge 输出（完整私有版）",
+  "type": "object",
+  "required": ["schema_version", "task_id", "run_id", "attempt_id", "judge_type", "score", "max_score", "passed", "dimension_scores", "passed_rules", "failed_rules", "feedback_to_agent", "reproducibility"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "task_id": { "type": "string" },
+    "run_id": { "type": "string" },
+    "attempt_id": { "type": "string" },
+    "judge_type": { "enum": ["rules", "script", "hybrid"] },
+    "score": { "type": "number", "minimum": 0 },
+    "max_score": { "type": "integer", "minimum": 1 },
+    "passed": { "type": "boolean" },
+    "dimension_scores": { "type": "object", "additionalProperties": { "type": "number" } },
+    "passed_rules": { "type": "array", "items": { "type": "string" } },
+    "failed_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "message", "severity", "dimension", "points_lost", "blocking"],
+        "properties": {
+          "rule_id": { "type": "string" },
+          "message": { "type": "string" },
+          "severity": { "enum": ["low", "medium", "high", "critical"] },
+          "dimension": { "type": "string" },
+          "points_lost": { "type": "number" },
+          "blocking": { "type": "boolean" }
+        }
+      }
+    },
+    "feedback_to_agent": { "type": "string" },
+    "private_notes": { "type": "string" },
+    "reproducibility": {
+      "type": "object",
+      "required": ["engine_version", "judge_version", "judge_rules_fingerprint", "submission_fingerprint", "workspace_fingerprint", "judged_at", "deterministic"],
+      "properties": {
+        "engine_version": { "type": "string" },
+        "judge_version": { "type": "string" },
+        "judge_rules_fingerprint": { "type": "string" },
+        "submission_fingerprint": { "type": "string" },
+        "workspace_fingerprint": { "type": "string" },
+        "judged_at": { "type": "string" },
+        "deterministic": { "type": "boolean" }
+      }
+    }
+  }
+}

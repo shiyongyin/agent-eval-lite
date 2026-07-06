@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.local/schemas/trace.event.schema.json",
+  "title": "Trace 事件信封",
+  "type": "object",
+  "required": ["event_id", "run_id", "seq", "timestamp", "type", "payload"],
+  "properties": {
+    "event_id": { "type": "string", "pattern": "^evt_[0-9]{6}$" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "seq": { "type": "integer", "minimum": 1 },
+    "timestamp": { "type": "string" },
+    "type": {
+      "enum": ["run_started", "agent_started", "agent_finished", "tool_call", "shell_command", "submission_received", "submission_invalid", "judge_started", "judge_completed", "feedback_delivered", "stop_hook_triggered", "resume", "error", "usage_recorded", "final_selection", "run_completed"]
+    },
+    "attempt_id": { "type": "string" },
+    "payload": { "type": "object" }
+  }
+}
