@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
@@ -154,7 +155,8 @@ public final class SuiteCommand implements Callable<Integer> {
     }
 
     private AgentSpec buildAgent() {
-        return switch (agentType) {
+        // 与 run --agent 的解析口径一致：大小写不敏感（RunCommand 用 toLowerCase 归一）。
+        return switch (agentType.toLowerCase(Locale.ROOT)) {
             case "scripted" -> {
                 if (cmd != null) {
                     throw new IllegalArgumentException("--cmd 仅在 --agent cli 时有效");
@@ -228,7 +230,7 @@ public final class SuiteCommand implements Callable<Integer> {
             index++;
             String type = node.path("type").asText("");
             String agentLabel = node.path("label").asText("");
-            AgentSpec spec = switch (type) {
+            AgentSpec spec = switch (type.toLowerCase(Locale.ROOT)) {
                 case "scripted" -> agentLabel.isBlank() ? AgentSpec.scripted()
                         : new AgentSpec(agentLabel, true, AgentSpec.scripted().factory());
                 case "cli" -> {

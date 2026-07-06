@@ -98,7 +98,7 @@ public final class RunCommand implements Callable<Integer> {
     }
 
     private AgentAdapter buildAdapter() {
-        return switch (agent.toLowerCase()) {
+        return switch (agent.toLowerCase(java.util.Locale.ROOT)) {
             case "manual" -> new ManualAgentAdapter(submission);
             case "scripted" -> {
                 if (script == null) {
