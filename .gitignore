@@ -1,5 +1,9 @@
 target/
 runs/
+# 红队套件运行时生成的派生夹具（run_all.sh 每次重建，不入库）
+redteam/valid_api.json
+redteam/B-submission/b8_oversized.json
+redteam/E-judge/code-fix-001/
 # PoC 依赖与运行产物（保留脚本/配置，忽略大体积生成物）
 research/poc/.venv/
 research/poc/node_modules/
