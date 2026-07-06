@@ -16,13 +16,18 @@ import picocli.CommandLine.Option;
  * # 写出 OTLP JSON 文件（默认落在 run 目录 report/ 下）
  * agent-eval export --run runs/tool-call-001/run_xxx
  *
- * # 直接推给本地 Phoenix（先 pip install arize-phoenix && phoenix serve）
+ * # 直接推给接受 OTLP/JSON 的收集器（OTel Collector 的 4318 端口等）
  * agent-eval export --run runs/tool-call-001/run_xxx \
- *     --endpoint http://localhost:6006/v1/traces
+ *     --endpoint http://localhost:4318/v1/traces
  * }</pre>
  *
  * <p>导出是纯读、幂等的：span/trace id 由 run/attempt/call id 确定性派生，
  * 重复导出同一 run 不会在看板里产生分叉数据。
+ *
+ * <p>注意：本命令按 OTLP/HTTP 规范以 {@code application/json} 推送。个别后端
+ * （如 Arize Phoenix 17.x 的 {@code /v1/traces}）只收 protobuf 会回 415，
+ * 此时经 OTel Collector 中转，或用 {@code research/poc/phoenix/push_otlp_json.py}
+ * 把导出的 JSON 转成 protobuf 直推（已实测 Phoenix 可收）。
  *
  * @author shiyongyin
  * @since 0.1.0
@@ -67,7 +72,9 @@ public final class ExportCommand implements Callable<Integer> {
                 if (e instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
                 }
-                System.err.println("错误: 推送失败: " + e.getMessage());
+                String reason = e.getMessage() == null
+                        ? e.getClass().getSimpleName() : e.getMessage();
+                System.err.println("错误: 推送失败（" + endpoint + "）: " + reason);
                 return 1;
             }
         }
