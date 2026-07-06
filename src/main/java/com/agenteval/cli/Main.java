@@ -26,7 +26,8 @@ import picocli.CommandLine.Command;
                 ExportCommand.class,
                 ValidateCommand.class,
                 ListCommand.class,
-                ToolCommand.class
+                ToolCommand.class,
+                TaskCommand.class
         })
 public final class Main {
 
