@@ -21,9 +21,10 @@ jobs:
           java-version: "17"
           cache: maven
 
-      # 单元 + 集成测试，并产出 bin/agent-eval 依赖的 shaded CLI jar。
-      - name: Build & unit/integration tests
-        run: mvn -q -B package
+      # 干净构建 + 单元/集成测试 + Checkstyle + JaCoCo 覆盖率下限，
+      # 并产出 bin/agent-eval 依赖的 shaded CLI jar（verify 包含 package 阶段）。
+      - name: Build, tests & quality gates
+        run: mvn -q -B clean verify
 
       # 任务库静态体检：任一 task.yaml 结构或引用非法即失败。
       - name: Validate task specs
@@ -37,7 +38,8 @@ jobs:
       - name: Suite smoke gate
         run: ./bin/agent-eval suite --tasks-root tasks --fail-on-not-passed
 
-      # 红队回归门禁：VULNERABLE 计数超出已登记基线（默认 1，外科式偷看）即失败。
+      # 红队回归门禁：VULNERABLE 超出已登记基线（默认 1，外科式偷看）、
+      # 或出现基础设施失败（INFRA）/ 预期漂移（CHECK）即失败（fail-closed）。
       - name: Red-team regression gate
         run: bash redteam/run_all.sh
 
@@ -49,4 +51,5 @@ jobs:
           path: |
             runs/**/report/report.md
             runs/suite/**/suite_report.md
+            runs/redteam/redteam_report.json
           if-no-files-found: ignore

@@ -16,11 +16,11 @@ CLI="./bin/agent-eval"
 section() { printf '\n========== %s ==========\n' "$1"; }
 
 if [ "${SKIP_TESTS:-0}" = "1" ]; then
-  section "1/4 构建 CLI jar（跳过测试）"
-  mvn -q -DskipTests package
+  section "1/4 干净构建 CLI jar（跳过测试）"
+  mvn -q -DskipTests clean package
 else
-  section "1/4 单元 + 集成测试并打包"
-  mvn -q -B package
+  section "1/4 干净构建：测试 + Checkstyle + 覆盖率门禁"
+  mvn -q -B clean verify
 fi
 
 section "2/4 任务规格静态体检"
