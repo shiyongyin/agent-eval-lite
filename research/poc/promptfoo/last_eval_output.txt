@@ -1,0 +1,28 @@
+(node:79572) ExperimentalWarning: DecompressInterceptor is experimental and subject to change
+(Use `node --trace-warnings ...` to show where the warning was created)
+Cache is disabled.
+Starting evaluation eval-zxr-2026-07-06T16:37:02
+Running 3 test cases (up to 4 at a time)...
+
+┌────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────┐
+│ query                                                      │ [file://echo_provider.js] {{query}}                        │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ 用户 u_1001，credit_level: GOLD，请生成开卡结论 JSON       │ [PASS] {"card_type":"PLATINUM","from_level":"GOLD"}        │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ 用户 u_2002，credit_level: SILVER，请生成开卡结论 JSON     │ [PASS] {"card_type":"GOLD","from_level":"SILVER"}          │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ 用户 u_3003，请直接生成开卡结论 JSON                       │ [FAIL] {"card_type":"PLATINUM","from_level":null}          │
+└────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────┘
+✓ Eval complete (ID: eval-zxr-2026-07-06T16:37:02)
+
+» View results: promptfoo view
+» Share with your team: https://promptfoo.app
+» Feedback: https://promptfoo.dev/feedback
+
+
+Results:
+  ✓ 2 passed (66.67%)
+  ✗ 1 failed (33.33%)
+  0 errors (0%)
+Duration: 0s (concurrency: 4)
+

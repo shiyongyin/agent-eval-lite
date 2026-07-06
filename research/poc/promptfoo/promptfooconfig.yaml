@@ -1,0 +1,41 @@
+# PoC B — promptfoo 作为 prompt/输出回归测试 + CI 门禁（离线，无 LLM 依赖）。
+# 被测系统 = echo_provider.js（确定性函数），因此结论 100% 可复现。
+# 三条测试对应 AgentEval-Lite 想要的三种确定性 check：
+#   1) is-json + javascript：schema/字段校验（等价 json_schema + jsonpath_equals）
+#   2) 正例：有依据 → 卡种正确
+#   3) 反例：无依据的猜测 → 被断言抓住（等价「幻觉/无证据」回归失败）
+description: AgentEval-Lite PoC — 开卡结论回归测试
+
+providers:
+  - file://echo_provider.js
+
+prompts:
+  - '{{query}}'
+
+tests:
+  - description: GOLD 等级 → PLATINUM 卡（有依据，应通过）
+    vars:
+      query: '用户 u_1001，credit_level: GOLD，请生成开卡结论 JSON'
+    assert:
+      - type: is-json
+      - type: javascript
+        value: JSON.parse(output).card_type === 'PLATINUM'
+
+  - description: SILVER 等级 → GOLD 卡（有依据，应通过）
+    vars:
+      query: '用户 u_2002，credit_level: SILVER，请生成开卡结论 JSON'
+    assert:
+      - type: is-json
+      - type: javascript
+        value: JSON.parse(output).card_type === 'GOLD'
+
+  - description: 无 credit_level → 系统给出无依据猜测（回归应判失败）
+    vars:
+      query: '用户 u_3003，请直接生成开卡结论 JSON'
+    assert:
+      - type: is-json
+      # 断言「结论必须有依据」：from_level 不能为 null。
+      # echo_provider 在没有依据时会猜 PLATINUM 且 from_level=null → 此断言失败，
+      # 正好演示 promptfoo 能抓住「无证据的输出」这类回归。
+      - type: javascript
+        value: JSON.parse(output).from_level !== null
