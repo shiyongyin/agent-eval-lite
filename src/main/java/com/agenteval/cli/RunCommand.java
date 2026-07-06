@@ -2,11 +2,13 @@ package com.agenteval.cli;
 
 import com.agenteval.agent.AgentAdapter;
 import com.agenteval.agent.CliAgentAdapter;
+import com.agenteval.agent.HttpAgentAdapter;
 import com.agenteval.agent.ManualAgentAdapter;
 import com.agenteval.agent.ScriptedAgentAdapter;
 import com.agenteval.runner.RunManager;
 import com.agenteval.state.RunStatus;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -27,6 +29,10 @@ import picocli.CommandLine.Option;
  * agent-eval run --task tasks/code-fix-001 --agent cli \
  *     --cmd 'claude -p "$(cat {instructions})" --dangerously-skip-permissions' --model claude-sonnet
  *
+ * # 评估服务形态的 Agent（框架按轮 POST 任务说明，响应体即提交；契约见 HttpAgentAdapter）
+ * agent-eval run --task tasks/api-payload-001 --agent http \
+ *     --endpoint http://localhost:8080/agent --http-header 'Authorization: Bearer xxx'
+ *
  * # 恢复被中断的 run
  * agent-eval run --resume runs/code-fix-001/run_20260706_101500_ab12cd --agent cli --cmd '...'
  * }</pre>
@@ -40,7 +46,7 @@ public final class RunCommand implements Callable<Integer> {
     @Option(names = "--task", description = "任务目录（新 run 必填）")
     private Path taskDir;
 
-    @Option(names = "--agent", required = true, description = "agent 适配器: manual | scripted | cli")
+    @Option(names = "--agent", required = true, description = "agent 适配器: manual | scripted | cli | http")
     private String agent;
 
     @Option(names = "--submission", description = "manual 模式：单发提交文件（不提供则进入交互模式）")
@@ -51,6 +57,12 @@ public final class RunCommand implements Callable<Integer> {
 
     @Option(names = "--cmd", description = "cli 模式：agent 命令模板（支持 {instructions} {workspace} {inbox} {attempt_id} {feedback} {run_dir} 占位符）")
     private String cmd;
+
+    @Option(names = "--endpoint", description = "http 模式：Agent 服务端点 URL（框架按轮 POST 任务说明并收取提交）")
+    private String endpoint;
+
+    @Option(names = "--http-header", description = "http 模式：附加请求头（形如 'Authorization: Bearer xxx'，可重复）")
+    private List<String> httpHeaders;
 
     @Option(names = "--model", description = "模型标识（仅用于报告归档）")
     private String model;
@@ -111,6 +123,12 @@ public final class RunCommand implements Callable<Integer> {
                     throw new IllegalArgumentException("cli 模式需要 --cmd <命令模板>");
                 }
                 yield new CliAgentAdapter(cmd);
+            }
+            case "http" -> {
+                if (endpoint == null || endpoint.isBlank()) {
+                    throw new IllegalArgumentException("http 模式需要 --endpoint <Agent 服务 URL>");
+                }
+                yield new HttpAgentAdapter(endpoint, httpHeaders);
             }
             default -> throw new IllegalArgumentException("未知 agent 适配器: " + agent);
         };

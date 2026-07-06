@@ -55,6 +55,11 @@ import picocli.CommandLine.Option;
  *   - label: my-agent
  *     type: cli
  *     cmd: 'bash my_agent.sh'
+ *   - label: my-service
+ *     type: http
+ *     endpoint: http://localhost:8080/agent
+ *     headers:                       # 可选
+ *       - 'Authorization: Bearer xxx'
  * }</pre>
  *
  * @author shiyongyin
@@ -77,12 +82,20 @@ public final class SuiteCommand implements Callable<Integer> {
     private String[] onlyTasks;
 
     @Option(names = "--agent", defaultValue = "scripted",
-            description = "Agent 类型：scripted（回放，默认）或 cli（真实命令行 Agent）")
+            description = "Agent 类型：scripted（回放，默认）、cli（命令行 Agent）或 http（服务型 Agent）")
     private String agentType;
 
     @Option(names = "--cmd",
             description = "cli Agent 的命令模板（--agent cli 时必填，支持 {instructions} 等占位符）")
     private String cmd;
+
+    @Option(names = "--endpoint",
+            description = "http Agent 的服务端点 URL（--agent http 时必填）")
+    private String endpoint;
+
+    @Option(names = "--http-header",
+            description = "http Agent 的附加请求头（形如 'Authorization: Bearer xxx'，可重复）")
+    private List<String> httpHeaders;
 
     @Option(names = "--label", description = "Agent 标签（进入报告；默认取 Agent 类型名）")
     private String label;
@@ -170,8 +183,14 @@ public final class SuiteCommand implements Callable<Integer> {
                 }
                 yield AgentSpec.cli(label, cmd);
             }
+            case "http" -> {
+                if (endpoint == null || endpoint.isBlank()) {
+                    throw new IllegalArgumentException("--agent http 需要 --endpoint 提供服务 URL");
+                }
+                yield AgentSpec.http(label, endpoint, httpHeaders);
+            }
             default -> throw new IllegalArgumentException(
-                    "不支持的 Agent 类型: " + agentType + "（可选 scripted / cli）");
+                    "不支持的 Agent 类型: " + agentType + "（可选 scripted / cli / http）");
         };
     }
 
@@ -240,8 +259,18 @@ public final class SuiteCommand implements Callable<Integer> {
                     }
                     yield AgentSpec.cli(agentLabel.isBlank() ? "cli-" + index : agentLabel, agentCmd);
                 }
+                case "http" -> {
+                    String agentEndpoint = node.path("endpoint").asText("");
+                    if (agentEndpoint.isBlank()) {
+                        throw new IllegalArgumentException("第 " + index + " 个 agent（http）缺少 endpoint");
+                    }
+                    List<String> headers = new ArrayList<>();
+                    node.path("headers").forEach(h -> headers.add(h.asText()));
+                    yield AgentSpec.http(agentLabel.isBlank() ? "http-" + index : agentLabel,
+                            agentEndpoint, headers);
+                }
                 default -> throw new IllegalArgumentException(
-                        "第 " + index + " 个 agent 类型不合法: " + type + "（可选 scripted / cli）");
+                        "第 " + index + " 个 agent 类型不合法: " + type + "（可选 scripted / cli / http）");
             };
             if (!labels.add(spec.label())) {
                 throw new IllegalArgumentException("agent 标签重复: " + spec.label());

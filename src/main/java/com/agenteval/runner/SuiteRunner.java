@@ -2,6 +2,7 @@ package com.agenteval.runner;
 
 import com.agenteval.agent.AgentAdapter;
 import com.agenteval.agent.CliAgentAdapter;
+import com.agenteval.agent.HttpAgentAdapter;
 import com.agenteval.agent.ScriptedAgentAdapter;
 import com.agenteval.state.RunStatus;
 import com.agenteval.task.TaskSpec;
@@ -85,6 +86,19 @@ public final class SuiteRunner {
         public static AgentSpec cli(String label, String cmd) {
             return new AgentSpec(label == null || label.isBlank() ? "cli" : label, false,
                     taskDir -> new CliAgentAdapter(cmd));
+        }
+
+        /**
+         * HTTP Agent（评估服务形态的 Agent；契约见 {@link HttpAgentAdapter}）。
+         *
+         * @param label 标签（用于对比面板区分）
+         * @param endpoint Agent 服务端点 URL
+         * @param headers 附加请求头（形如 {@code "Authorization: Bearer xxx"}；可为 {@code null}）
+         * @return 规格
+         */
+        public static AgentSpec http(String label, String endpoint, List<String> headers) {
+            return new AgentSpec(label == null || label.isBlank() ? "http" : label, false,
+                    taskDir -> new HttpAgentAdapter(endpoint, headers));
         }
     }
 

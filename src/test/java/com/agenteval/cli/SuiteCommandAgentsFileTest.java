@@ -28,15 +28,23 @@ class SuiteCommandAgentsFileTest {
                   - label: my-agent
                     type: cli
                     cmd: 'bash my_agent.sh'
+                  - label: my-service
+                    type: http
+                    endpoint: http://localhost:8080/agent
+                    headers:
+                      - 'Authorization: Bearer xxx'
                 """);
 
         List<SuiteRunner.AgentSpec> specs = SuiteCommand.parseAgentsFile(file);
 
-        assertThat(specs).hasSize(2);
+        assertThat(specs).hasSize(3);
         assertThat(specs.get(0).label()).isEqualTo("baseline");
         assertThat(specs.get(0).requiresReplay()).isTrue();
         assertThat(specs.get(1).label()).isEqualTo("my-agent");
         assertThat(specs.get(1).requiresReplay()).isFalse();
+        assertThat(specs.get(2).label()).isEqualTo("my-service");
+        assertThat(specs.get(2).requiresReplay()).isFalse();
+        assertThat(specs.get(2).factory().apply(Path.of("tasks")).name()).isEqualTo("http");
     }
 
     @Test
@@ -53,11 +61,24 @@ class SuiteCommandAgentsFileTest {
     }
 
     @Test
+    void http缺少endpoint_报可读错误() throws Exception {
+        Path file = write("""
+                agents:
+                  - label: broken-http
+                    type: http
+                """);
+
+        assertThatThrownBy(() -> SuiteCommand.parseAgentsFile(file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("缺少 endpoint");
+    }
+
+    @Test
     void 类型不合法_报可读错误() throws Exception {
         Path file = write("""
                 agents:
                   - label: x
-                    type: http
+                    type: grpc
                 """);
 
         assertThatThrownBy(() -> SuiteCommand.parseAgentsFile(file))
