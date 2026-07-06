@@ -1,0 +1,7 @@
+# 回放脚本：第 1 轮只声称修复（不改文件）被识破，第 2 轮真实修复后通过。
+attempts:
+  - submission_file: samples/attempt-fail.json
+  - apply_files:
+      - target: src/PriceCalculator.java
+        source: samples/PriceCalculator.fixed.java
+    submission_file: samples/attempt-pass.json

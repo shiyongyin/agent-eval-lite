@@ -1,0 +1,1 @@
+{ "schema_version":1, "attempt_id":"attempt_001", "submission_type":"api_payload", "summary":"缺少task_id字段的提交", "known_risks":[], "needs_human_review":false, "final_payload":{} }

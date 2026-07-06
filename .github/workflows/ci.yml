@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# 说明：本流水线是「框架自证」的门禁——单元测试 + 任务集回放冒烟 + 红队回归三道闸，
+# 任一道被破坏都会挡下合并。全部步骤都是确定性的（回放/mock，不依赖模型或网络）。
+jobs:
+  build-and-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      # 单元 + 集成测试，并产出 bin/agent-eval 依赖的 shaded CLI jar。
+      - name: Build & unit/integration tests
+        run: mvn -q -B package
+
+      # 任务库静态体检：任一 task.yaml 结构或引用非法即失败。
+      - name: Validate task specs
+        run: |
+          set -e
+          for d in tasks/*/; do
+            ./bin/agent-eval validate --task "$d"
+          done
+
+      # 冒烟门禁：批跑每个任务的确定性回放闭环，任一未通过则退出码 3 使 CI 失败。
+      - name: Suite smoke gate
+        run: ./bin/agent-eval suite --tasks-root tasks --fail-on-not-passed
+
+      # 红队回归门禁：VULNERABLE 计数超出已登记基线（默认 1，外科式偷看）即失败。
+      - name: Red-team regression gate
+        run: bash redteam/run_all.sh
+
+      - name: Upload eval artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-reports
+          path: |
+            runs/**/report/report.md
+            runs/suite/**/suite_report.md
+          if-no-files-found: ignore
