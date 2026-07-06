@@ -32,6 +32,7 @@ section "3/4 任务集回放冒烟门禁"
 "$CLI" suite --tasks-root tasks --fail-on-not-passed
 
 section "4/4 红队回归基线门禁"
+bash redteam/test_gate.sh   # 门禁判定逻辑自测（毫秒级），先证门禁本身没退化
 bash redteam/run_all.sh
 
 section "冒烟门禁全部通过 ✓"

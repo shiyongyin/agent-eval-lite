@@ -40,8 +40,11 @@ jobs:
 
       # 红队回归门禁：VULNERABLE 超出已登记基线（默认 1，外科式偷看）、
       # 或出现基础设施失败（INFRA）/ 预期漂移（CHECK）即失败（fail-closed）。
+      # 先跑门禁判定逻辑自测（负向用例钉死 fail-closed 契约），再跑真实攻击回归。
       - name: Red-team regression gate
-        run: bash redteam/run_all.sh
+        run: |
+          bash redteam/test_gate.sh
+          bash redteam/run_all.sh
 
       - name: Upload eval artifacts
         if: always()

@@ -15,6 +15,8 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 ROOT="$PWD"
 RUNS="runs/redteam"
 CLI="./bin/agent-eval"
+# 门禁判定为纯函数（evaluate_gate），由 redteam/test_gate.sh 做正/负向自测防 fail-open 退化。
+source redteam/gate_lib.sh
 PASS=0; FAIL=0; INFRA=0; CHECKN=0
 declare -a MATRIX
 
@@ -47,6 +49,29 @@ infra() { # name expected —— 登记一条基础设施失败
 if ! ls target/agent-eval-lite-*-cli.jar >/dev/null 2>&1; then
   echo "[setup] building CLI jar ..."; mvn -q -DskipTests package >/dev/null
 fi
+
+# 并发互斥：两个 run_all.sh 同时写 runs/redteam 会互删对方的 run 目录（开头 rm -rf），
+# last_run 还可能读到对方尚未写完的 report.json（表现为莫名的 INFRA）。
+# 用 mkdir 原子性做锁（macOS bash 3.2 无 flock）；锁内记录持有者 PID，
+# 持有者已死则视为异常退出残留，自动清理后重试一次。
+LOCK_DIR="runs/.redteam.lock"
+mkdir -p runs
+acquire_lock() {
+  mkdir "$LOCK_DIR" 2>/dev/null && echo $$ > "$LOCK_DIR/pid"
+}
+if ! acquire_lock; then
+  HOLDER="$(cat "$LOCK_DIR/pid" 2>/dev/null || echo '?')"
+  if [ "$HOLDER" != "?" ] && ! kill -0 "$HOLDER" 2>/dev/null; then
+    echo "[lock] 清理失效锁（持有者 PID=$HOLDER 已退出）" >&2
+    rm -rf "$LOCK_DIR"
+  fi
+  if ! acquire_lock; then
+    echo "[gate] 另一个红队回归正在运行（$LOCK_DIR 由 PID=$HOLDER 持有），并发运行会互相破坏 runs/redteam，已中止。" >&2
+    exit 1
+  fi
+fi
+trap 'rm -rf "$LOCK_DIR"' EXIT
+
 rm -rf "$RUNS"; mkdir -p "$RUNS"
 
 # 派生/大体积夹具在运行时生成，避免入库垃圾文件。
@@ -221,12 +246,7 @@ VULN=$FAIL
 # 已登记的 VULNERABLE 基线（默认 1：外科式偷看 hidden 只取数字、canary 不外泄的残留项）。
 # CI 门禁只在「新增」VULNERABLE（超出基线）时失败；INFRA / CHECK 一律失败（fail-closed）。
 ALLOWED_VULN="${RT_ALLOWED_VULN:-1}"
-GATE="pass"
-declare -a GATE_REASONS=()
-# 注意：变量后紧跟全角字符时必须用 ${VAR}，macOS bash 3.2 会把多字节字符并入变量名。
-if [ "$VULN" -gt "$ALLOWED_VULN" ]; then GATE="fail"; GATE_REASONS+=("VULNERABLE=${VULN} 超出允许基线 ${ALLOWED_VULN}（出现新的可绕过点）"); fi
-if [ "$INFRA" -gt 0 ]; then GATE="fail"; GATE_REASONS+=("INFRA=${INFRA}（基础设施失败不猜好坏，按门禁失败处理）"); fi
-if [ "$CHECKN" -gt 0 ]; then GATE="fail"; GATE_REASONS+=("CHECK=${CHECKN}（观测值偏离登记预期，需人工确认后更新基线）"); fi
+GATE_REASONS_TEXT="$(evaluate_gate "$VULN" "$INFRA" "$CHECKN" "$ALLOWED_VULN")" && GATE="pass" || GATE="fail"
 
 # 结构化报告：无论门禁通过与否都写出，供 CI 工件与趋势分析消费。
 printf '%s\n' "${MATRIX[@]}" | python3 -c '
@@ -255,7 +275,9 @@ echo "结构化报告: $RUNS/redteam_report.json"
 echo "DEFENDED(好)=${PASS} | VULNERABLE(需修)=${VULN}（允许基线=${ALLOWED_VULN}） | INFRA=${INFRA} | CHECK=${CHECKN}"
 echo "（VULNERABLE 项即当前可被 Agent 绕过之处，见审计报告 P0/P1）"
 if [ "$GATE" = "fail" ]; then
-  for reason in "${GATE_REASONS[@]}"; do echo "[gate] 红队门禁失败：$reason" >&2; done
+  while IFS= read -r reason; do
+    [ -n "$reason" ] && echo "[gate] 红队门禁失败：$reason" >&2
+  done <<< "$GATE_REASONS_TEXT"
   exit 1
 fi
 echo "[gate] 红队回归通过：VULNERABLE 未超出登记基线，且无 INFRA / CHECK。"
