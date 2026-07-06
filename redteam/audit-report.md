@@ -171,7 +171,7 @@
 
 | 命令 | 结果 |
 |---|---|
-| `mvn -q -B clean verify` | 通过：112 个测试全绿，JaCoCo 指令覆盖率 0.7798（≥ 0.75 门禁），Checkstyle 无违规 |
+| `mvn -q -B clean verify` | 通过：127 个测试全绿，JaCoCo 指令覆盖率 0.7852（≥ 0.75 门禁），Checkstyle 无违规 |
 | `bin/agent-eval suite --tasks-root tasks --fail-on-not-passed` | 通过：5/5 任务稳定通过 |
 | `bash redteam/run_all.sh` | 14 项：13 DEFENDED / 1 VULNERABLE（登记基线：红队 A 外科式偷看）/ INFRA=0 / CHECK=0 |
 | `bash redteam/test_gate.sh` | 门禁判定 fail-closed 契约自测 7/7 通过 |
@@ -199,5 +199,5 @@
 ### 11.4 维持不变的结论
 
 - **P0 未修**：外科式偷看 hidden（红队 A）仍是登记基线残留——同机同用户文件系统下无法根治，仍需 §9 第 1 条 Docker Runner（Agent 容器只挂载 workspace/inbox/feedback）落地，这是通往「强对抗可信」的唯一必修项。
-- §3 未实现清单中的容器级强隔离、真实 HTTP AgentAdapter、真实工具权限模型、auto-eval 后台采样、LLM judge 防注入仍未实现（HTTP Adapter 为 Phase 2 首项）。
+- §3 未实现清单中的容器级强隔离、真实工具权限模型、auto-eval 后台采样、LLM judge 防注入仍未实现。HTTP AgentAdapter 已按窄口径落地（2026-07-07：框架按轮 POST、响应体即提交，`run`/`suite`/`agents-file` 全线支持，端到端测试覆盖 fail→pass/放弃/5xx/不可达路径）——注意其安全边界与 cli 适配器相同（同机信任模型），不改变本报告的隔离结论。
 - command nonce 非密码学强度、run 结束后产物篡改两处残余风险声明继续有效（见 README「安全边界」）。

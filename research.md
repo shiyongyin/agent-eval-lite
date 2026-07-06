@@ -13,7 +13,7 @@
 - `src/main/java/com/agenteval/cli`：命令行入口与子命令。
 - `src/main/java/com/agenteval/runner`：一次评估 run 的生命周期编排。
 - `src/main/java/com/agenteval/task`：`task.yaml` 加载、校验、说明渲染。
-- `src/main/java/com/agenteval/agent`：manual、scripted、cli 三类 Agent 适配器。
+- `src/main/java/com/agenteval/agent`：manual、scripted、cli、http 四类 Agent 适配器。
 - `src/main/java/com/agenteval/submission`：提交 JSON 的信封和分型 schema 校验。
 - `src/main/java/com/agenteval/judge`：规则评审、脚本评审和分数聚合。
 - `src/main/java/com/agenteval/tool`：mock 工具网关与工具调用留痕。
@@ -22,7 +22,7 @@
 
 ## 3. 核心流程
 
-主流程从 `agent-eval run` 开始。`RunCommand` 根据 `--agent` 选择 manual、scripted 或 cli 适配器，然后调用 `RunManager.execute` 执行评估，见 `src/main/java/com/agenteval/cli/RunCommand.java:67`。
+主流程从 `agent-eval run` 开始。`RunCommand` 根据 `--agent` 选择 manual、scripted、cli 或 http 适配器，然后调用 `RunManager.execute` 执行评估，见 `src/main/java/com/agenteval/cli/RunCommand.java`。
 
 `RunManager` 是核心编排器。新 run 会加载任务、创建 run 目录、复制 `work/` 到私有 `workspace/`、生成 `instructions.md`、记录 hidden 和 workspace 指纹，见 `src/main/java/com/agenteval/runner/RunManager.java:133` 和 `src/main/java/com/agenteval/workspace/WorkspaceManager.java:47`。
 
@@ -63,11 +63,13 @@ Work/Judge 隔离是项目的核心边界。Agent 只应看到复制后的 `work
 
 本轮更新后，项目从单任务 runner 扩展为可批量评估的本地 Agent benchmark。`Main` 已注册 `suite` 子命令；`SuiteRunner` 支持全任务回放、真实 CLI Agent 批跑、`repeat=k` 的 pass^k 可靠性，以及多 Agent 对比报告。CI 侧新增 `.github/workflows/ci.yml` 与 `bin/ci-smoke.sh`，本地门禁为 Maven 测试与打包、任务规格体检、suite 冒烟、红队回归四步。
 
+接入面同日完成 Phase 2：新增 `HttpAgentAdapter`（窄口径：框架按轮 POST 任务说明与反馈，`200` 响应体即提交、`204` 表示放弃，服务不可达按基础设施故障上抛），`run`/`suite`/`--agents-file` 全线支持 `http` 类型；任务工程化补上 `agent-eval task init` 脚手架（产物开箱即过 validate 与 fail→pass 回放闭环）与 `validate` 规则深度 lint（`expected_from` 断链、`schema_file` 缺失、check 引用白名单外工具在静态阶段拦截）。
+
 安全硬化也继续推进。`RulesJudge` 新增 `world_state` 终态比对能力，复用签名可信的成功 `tool_call` 事件重放世界终态；工具调用核验仍以 HMAC trace 为信任边界。`no_canary_leak` 已覆盖 `workspace/`、`agent-logs/`、`inbox/` 和 `traces/`，能抓住通过工具入参夹带 canary 的外泄路径。
 
 已验证命令（2026-07-07 复核）：
 
-- `mvn -q -B clean verify`：通过，112 个测试，JaCoCo 指令覆盖率 0.7798（门禁下限 0.75），Checkstyle 无违规。
+- `mvn -q -B clean verify`：通过，127 个测试，JaCoCo 指令覆盖率 0.7852（门禁下限 0.75），Checkstyle 无违规。
 - `bin/agent-eval suite --tasks-root tasks --fail-on-not-passed`：通过，5/5 任务稳定通过。
 - `bash redteam/run_all.sh`：通过，14 项中 13 DEFENDED / 1 登记基线 VULNERABLE，INFRA=0 / CHECK=0。
 - `bash redteam/test_gate.sh`：通过，门禁判定 fail-closed 契约 7 用例自测全绿。

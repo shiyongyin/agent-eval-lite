@@ -21,7 +21,7 @@
 
 ```bash
 # 构建（Java 17+，Maven）
-mvn -q package                 # 含 112 个单元/端到端测试
+mvn -q package                 # 含 127 个单元/端到端测试
 # 产物: target/agent-eval-lite-0.1.0-cli.jar（bin/agent-eval 会自动定位）
 
 # 看任务库
@@ -38,7 +38,7 @@ bin/agent-eval run --task tasks/api-payload-001 --agent scripted \
 cat runs/api-payload-001/run_*/report/report.md
 ```
 
-### 三种 Agent 接入方式
+### 四种 Agent 接入方式
 
 ```bash
 # 1. manual：把"人"当被评 Agent（调任务、建人工基线）
@@ -53,16 +53,24 @@ bin/agent-eval run --task tasks/code-fix-001 --agent scripted \
 bin/agent-eval run --task tasks/code-fix-001 --agent cli \
     --cmd 'claude -p "$(cat {instructions})" --dangerously-skip-permissions' \
     --model claude-sonnet
+
+# 4. http：评估服务形态的 Agent（chat API / Agent 平台入口 / 自研服务）
+bin/agent-eval run --task tasks/api-payload-001 --agent http \
+    --endpoint http://localhost:8080/agent --http-header 'Authorization: Bearer xxx'
 ```
 
 `cli` 模式的命令模板支持占位符 `{instructions} {workspace} {inbox} {attempt_id} {feedback} {run_dir}`（自动 shell 转义），并注入环境变量 `AEL_RUN_DIR / AEL_INSTRUCTIONS / AEL_WORKSPACE / AEL_INBOX / AEL_ATTEMPT_ID / AEL_FEEDBACK`。Agent 进程 cwd 固定为 workspace，超时强杀。
 
+`http` 模式走窄口径契约（框架推任务、收提交，不含 SSE/浏览器等重协议面）：框架每轮向 `--endpoint` `POST` 一个 JSON（`protocol=ael-http-agent/1`，含 `task_id / attempt_id / attempt_number / max_attempts / instructions 全文 / feedback（首轮 null）/ workspace_dir / inbox_dir / run_dir / tool_gateway{endpoint,token}`）；服务用 `200` + 提交信封 JSON 应答（响应体即本轮提交，之后的 schema 校验/判分/反馈与其他适配器同链路），`204` 表示放弃后续轮次，其他状态码/超时按本轮无提交继续。服务不可达按评估基础设施故障处理，不会误记为 Agent 低分。
+
 ### 其余命令
 
 ```bash
-bin/agent-eval validate --task tasks/xxx          # 任务静态体检（结构+引用+规则文件）
+bin/agent-eval task init --id my-task-001         # 生成新任务脚手架（开箱即过 validate 与 fail→pass 回放闭环）
+bin/agent-eval validate --task tasks/xxx          # 任务静态体检（结构+引用+规则文件+深度 lint：expected_from 断链/schema_file 缺失/白名单外工具前移拦截）
 bin/agent-eval suite --tasks-root tasks --fail-on-not-passed   # 任务集回放批跑（CI 冒烟门禁）
 bin/agent-eval suite --agent cli --cmd '...' --label my-agent --repeat 3   # 真实 Agent 批量过全部任务 + pass^3 可靠性
+bin/agent-eval suite --agent http --endpoint http://localhost:8080/agent --label my-service   # 服务型 Agent 批量过全部任务
 bin/agent-eval suite --agents-file agents.yaml --repeat 2      # 多 Agent 并列对比（任务×Agent 矩阵 + 排名面板）
 bin/agent-eval judge --task tasks/xxx --submission sub.json   # 离线复算分数（可复现承诺）
 bin/agent-eval report --run runs/xxx/run_yyy      # 从工件重建报告（纯读幂等）
@@ -81,7 +89,7 @@ bin/agent-eval export --run runs/xxx/run_yyy      # trace 导出 OTLP/OpenInfere
 
 - **CI 冒烟**（默认 `--agent scripted`）：批跑全部任务的确定性回放，验证框架闭环未劣化；
 - **真实 Agent 度量**：`--agent cli --cmd '...'` 让真实命令行 Agent 批量过全部任务；`--repeat k` 把每个任务跑 k 次，按 **pass^k** 口径（k 次全过才算稳定通过，借鉴 tau-bench）判可靠性，抓出「首跑过、复跑挂」的不稳定 Agent；
-- **多 Agent 并列对比**：`--agents-file agents.yaml` 让多个 Agent（scripted/cli 混搭）跑同一任务集，产出「任务 × Agent」矩阵与按稳定通过数排序的排名面板；
+- **多 Agent 并列对比**：`--agents-file agents.yaml` 让多个 Agent（scripted/cli/http 混搭）跑同一任务集，产出「任务 × Agent」矩阵与按稳定通过数排序的排名面板；
 - 报告（`suite_report.json` / `suite_report.md`）逐 run 记录真实墙钟时延并聚合平均耗时；Agent 在提交信封里自报 `usage`（model/token/cost，可选字段）时，单 run 报告与套件/对比面板会聚合出成本列——**自报数据只做 ROI 参考，不参与评分**，且以签名 trace 事件（`usage_recorded`）留痕。
 
 `agents.yaml` 格式：
@@ -93,11 +101,16 @@ agents:
   - label: my-agent
     type: cli
     cmd: 'claude -p "$(cat {instructions})" --dangerously-skip-permissions'
+  - label: my-service
+    type: http                # 服务型 Agent（窄口径 HTTP 契约）
+    endpoint: http://localhost:8080/agent
+    headers:                  # 可选
+      - 'Authorization: Bearer xxx'
 ```
 
 ### CI 冒烟门禁
 
-`.github/workflows/ci.yml` 与 `bin/ci-smoke.sh` 同口径三道闸：`mvn clean verify`（112 个测试 + Checkstyle 静态检查 + JaCoCo 指令覆盖率 ≥ 0.75 下限）→ 任务集回放批跑（`suite --fail-on-not-passed`，任一任务闭环回归被破坏即失败）→ 红队回归（`redteam/run_all.sh`，fail-closed：`VULNERABLE` 超出登记基线 `RT_ALLOWED_VULN`（默认 1）、或出现 INFRA（报告缺失/解析失败）/ CHECK（观测值偏离登记预期）即失败，另产出结构化工件 `redteam_report.json`；门禁判定逻辑抽为 `redteam/gate_lib.sh` 纯函数，由 `redteam/test_gate.sh` 的正/负向自测钉死 fail-closed 契约，同样进 CI）。全部步骤确定性（回放/mock，不依赖模型或网络）。
+`.github/workflows/ci.yml` 与 `bin/ci-smoke.sh` 同口径三道闸：`mvn clean verify`（127 个测试 + Checkstyle 静态检查 + JaCoCo 指令覆盖率 ≥ 0.75 下限）→ 任务集回放批跑（`suite --fail-on-not-passed`，任一任务闭环回归被破坏即失败）→ 红队回归（`redteam/run_all.sh`，fail-closed：`VULNERABLE` 超出登记基线 `RT_ALLOWED_VULN`（默认 1）、或出现 INFRA（报告缺失/解析失败）/ CHECK（观测值偏离登记预期）即失败，另产出结构化工件 `redteam_report.json`；门禁判定逻辑抽为 `redteam/gate_lib.sh` 纯函数，由 `redteam/test_gate.sh` 的正/负向自测钉死 fail-closed 契约，同样进 CI）。全部步骤确定性（回放/mock，不依赖模型或网络）。
 
 ## 内置示例任务（5 个，覆盖 5 类任务形态）
 
@@ -128,10 +141,11 @@ runs/<task-id>/<run-id>/ # 每次评估的自包含产物
 
 ### 写一个新任务
 
-1. 建目录 `tasks/my-task-001/`，写 `task.yaml`（`task_id` 必须等于目录名；维度权重之和必须等于满分）；
-2. 放 `work/` 材料，写 `hidden/judge.rules.yaml`（14 种 check 见下）；期望值放 `hidden/expected/`，用 `expected_from: "expected/x.json#/指针"` 引用，**不要**写进对外文案；
-3. `bin/agent-eval validate --task tasks/my-task-001` 过体检；
-4. 写 `samples/attempt-pass.json` + `replay.yaml`，用 scripted 跑通 fail→pass 闭环。
+1. `bin/agent-eval task init --id my-task-001` 生成脚手架——产物是一个**已经能跑**的最小任务（过 validate、自带 fail→pass 回放闭环），从它开始改而不是从空目录开始猜；
+2. 改 `task.yaml`（`task_id` 必须等于目录名；维度权重之和必须等于满分），替换 `work/` 材料；
+3. 改 `hidden/judge.rules.yaml`（14 种 check 见下）；期望值放 `hidden/expected/`，用 `expected_from: "expected/x.json#/指针"` 引用，**不要**写进对外文案；
+4. `bin/agent-eval validate --task tasks/my-task-001` 过体检（含深度 lint：`expected_from` 断链、`schema_file` 缺失、check 要求调用白名单外工具等 run 时才会炸的配置错误都在这里前移拦截）；
+5. 更新 `samples/attempt-pass.json` / `attempt-fail.json` + `replay.yaml`，用 scripted 跑通 fail→pass 闭环。
 
 **check 类型（14 种）**：`json_schema`、`jsonpath_equals`（支持 `expected`/`expected_from`/`tolerance`）、`jsonpath_exists`、`jsonpath_matches`、`list_coverage`（关键点组覆盖率，部分得分）、`evidence_sources_valid`、`workspace_file_exists`、`workspace_file_contains`、`changed_files_verified`（基线指纹核验）、`command`（临时副本上执行，`{hidden} {workspace} {submission} {task}` 占位符）、`tool_call_required`（trace 核验 + call_id 引用核验）、`tool_call_forbidden`、`world_state`（把 trace 中可信且成功的写工具调用折叠为世界终态，与期望的 `{tool, input}` 列表比对；`scope: attempt/run`、`order_sensitive` 可选——评的是「实际改成了什么」而非「提交里说了什么」）、`no_canary_leak`。
 
@@ -173,6 +187,6 @@ runs/<task-id>/<run-id>/ # 每次评估的自包含产物
 - **Phase 1.6（工程化，已落地）**：任务集回放批跑（`agent-eval suite`）+ CI 冒烟门禁（`bin/ci-smoke.sh`、`.github/workflows/ci.yml`：测试 + 套件 + 红队三道闸）
 - **Phase 1.7（生产度量，已落地）**：`suite` 支持真实 cli Agent 批量过任务、`--repeat k` 的 pass^k 可靠性口径、`--agents-file` 多 Agent 并列对比（任务×Agent 矩阵 + 排名面板）、逐 run 时延采集与聚合
 - **Phase 1.8（可观测与质量门禁，已落地）**：`agent-eval export` 导出 OTLP/OpenInference（Phoenix / Langfuse / OTel Collector 摄取，Phoenix 实测端到端）、`world_state` 终态比对 check（红队 I 拦截「过程对终态错」）、信封可选 `usage` 自报 + 单 run/套件/对比面板成本聚合、红队门禁 fail-closed 化 + `redteam_report.json` 结构化工件、JaCoCo 覆盖率下限 + Checkstyle 进 CI
-- **Phase 2**：HTTP AgentAdapter（评 agentScopeScaffold 的 chat API）
+- **Phase 2（服务接入与任务工程化，已落地）**：HTTP AgentAdapter 窄口径（框架按轮 POST 任务说明、响应体即提交；`run`/`suite`/`agents-file` 全线支持，可评 agentScopeScaffold 的 chat API 等服务型 Agent）+ `task init` 任务脚手架（开箱即过 validate 与回放闭环）+ `validate` 规则深度 lint。Playwright 级 Web 评估链路刻意不做（见 docs/04 §9）
 - **Phase 3**：真实工具（http/db 白名单 + 响应存档）、auto-eval 周期采样、LLM judge（低权重维度）
 - **Phase 4**：Docker Runner（work 容器不挂载 hidden，根治外科式偷看与运行时 nonce 重放）、结果仓库与看板
