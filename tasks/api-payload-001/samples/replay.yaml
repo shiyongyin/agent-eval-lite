@@ -1,0 +1,4 @@
+# 回放脚本：第 1 轮漏掉 VIP 折扣与加急标记，按反馈修正后第 2 轮通过。
+attempts:
+  - submission_file: samples/attempt-fail.json
+  - submission_file: samples/attempt-pass.json

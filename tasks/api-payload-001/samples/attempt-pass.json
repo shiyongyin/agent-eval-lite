@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "task_id": "api-payload-001",
+  "attempt_id": "{attempt_id}",
+  "submission_type": "api_payload",
+  "summary": "商品小计 5500 分，客户为 VIP 按文档规则打 9 折得 4950 分；加急要求映射为 order_type=EXPRESS",
+  "final_payload": {
+    "order_type": "EXPRESS",
+    "customer": { "customer_id": "C-8801", "level": "VIP" },
+    "items": [
+      { "sku": "SKU-A", "qty": 2, "unit_price_cents": 1250 },
+      { "sku": "SKU-B", "qty": 1, "unit_price_cents": 3000 }
+    ],
+    "total_amount_cents": 4950,
+    "currency": "CNY"
+  },
+  "evidence": [
+    { "type": "file", "source": "work/docs/api.md", "quote_or_ref": "VIP 客户享受 9 折：总额 = 商品小计 × 0.9，向下取整到分" },
+    { "type": "file", "source": "work/docs/request.md", "quote_or_ref": "会员等级 VIP；要求加急发货" }
+  ],
+  "known_risks": ["若后续增加优惠券叠加规则，折扣顺序需要确认"],
+  "needs_human_review": false
+}

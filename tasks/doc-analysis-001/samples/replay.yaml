@@ -1,0 +1,4 @@
+# 回放脚本：第 1 轮漏掉大半破坏性变更且混入普通特性，第 2 轮补全后通过。
+attempts:
+  - submission_file: samples/attempt-fail.json
+  - submission_file: samples/attempt-pass.json

@@ -1,0 +1,60 @@
+# doc-analysis-001 隐藏评审规则（Agent 不可见）
+# 材料中埋设的破坏性变更共 5 处：
+#   v2: nickname 字段移除 / session.timeout 秒改毫秒
+#   v3: Java 11→17 / 端口 8080→9090 / logging.legacy 开关移除
+# 干扰项：深色模式、标签、分页、审计页、导出中心、Caffeine→Redis（显式声明对外无影响）。
+schema_version: 1
+judge_version: "1.0.0"
+
+checks:
+  - id: BREAKING_COVERAGE
+    type: list_coverage
+    dimension: coverage
+    points: 45
+    severity: critical
+    path: "$.deliverable.content"
+    min_matches: 4
+    expected_any_of:
+      - ["nickname"]
+      - ["session.timeout", "毫秒", "millisecond"]
+      - ["java 17", "jdk 17", "java 最低版本", "java 基线"]
+      - ["9090"]
+      - ["logging.legacy", "legacy"]
+    feedback_fail: 破坏性变更覆盖不全，请再次逐版本梳理「变更」小节（注意配置与运行环境类变更）
+
+  - id: VERSION_ATTRIBUTION
+    type: list_coverage
+    dimension: accuracy
+    points: 25
+    severity: high
+    path: "$.deliverable.content"
+    min_matches: 2
+    expected_any_of:
+      - ["v2"]
+      - ["v3"]
+    feedback_fail: 清单未标注变更的来源版本，运维无法确定各变更在升级路径中的生效点
+
+  - id: SOURCES_VALID
+    type: evidence_sources_valid
+    dimension: evidence
+    points: 20
+    severity: medium
+    feedback_fail: sources 缺失或引用了任务材料之外的路径
+
+  - id: DELIVERABLE_IS_MARKDOWN
+    type: jsonpath_equals
+    dimension: format
+    points: 5
+    severity: low
+    path: "$.deliverable.type"
+    expected: "markdown"
+    feedback_fail: deliverable.type 应为 markdown
+
+  - id: HAS_STRUCTURE
+    type: jsonpath_matches
+    dimension: format
+    points: 5
+    severity: low
+    path: "$.deliverable.content"
+    regex: "(?m)^#|^-|^\\|"
+    feedback_fail: 交付内容缺少结构（标题/列表/表格），不便运维执行

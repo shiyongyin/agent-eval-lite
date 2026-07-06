@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "task_id": "prd-review-001",
+  "attempt_id": "{attempt_id}",
+  "submission_type": "review",
+  "summary": "整体看了一遍 PRD，提了一点建议",
+  "deliverable": {
+    "type": "markdown",
+    "content": "# 评审意见\n\nPRD 整体清晰，页面流程完整。建议兑换记录里补充 user_id 字段，另外原型图记得附上。其他没有大问题，可以进入开发。\n"
+  },
+  "sources": ["work/prd.md"],
+  "confidence": 0.8,
+  "known_risks": [],
+  "needs_human_review": false
+}

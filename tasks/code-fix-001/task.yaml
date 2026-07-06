@@ -1,0 +1,60 @@
+schema_version: 1
+task_id: code-fix-001
+task_name: 修复价格计算器的越界与空指针缺陷
+task_type: code_fix
+description: >
+  评估 Agent 在最小 Java 代码库上的缺陷修复能力：能否定位 off-by-one 与 null 处理问题、
+  真实修改代码（而非只声称改了）、并如实申报自测情况。隐藏评审会在临时副本上编译并运行
+  行为规格程序验证修复效果。
+
+agent_brief: |
+  工作区 `src/PriceCalculator.java` 中的 `total(List<Integer>)` 方法存在缺陷：部分调用会抛出异常。
+
+  期望行为：
+  1. `total([100, 250, 30])` 返回 `380`；
+  2. 空列表返回 `0`；
+  3. `null` 入参返回 `0`。
+
+  请修复该方法（保持类名与方法签名不变），确保上述行为全部成立；
+  同时不得破坏工作区中已有的其它方法（如 `maxPrice`）的现有正确行为；
+  在提交中如实申报你修改的文件（changed_files）与自行验证的方式（tests_run）。
+
+visible_context:
+  - work/README.md
+  - work/src/PriceCalculator.java
+
+allowed_tools: []
+
+submit:
+  format: json
+  schema: builtin:code_fix
+  max_attempts: 3
+  cooldown_seconds: 0
+
+judge:
+  type: rules
+  rules_file: hidden/judge.rules.yaml
+  feedback:
+    level: failed_rules
+    include_scores: true
+
+scoring:
+  max_score: 100
+  pass_score: 80
+  selection: best_score
+  dimensions:
+    - name: correctness
+      weight: 50
+    - name: tests
+      weight: 20
+    - name: format
+      weight: 15
+    - name: explanation
+      weight: 15
+
+runtime:
+  timeout_minutes: 30
+  attempt_timeout_minutes: 10
+  allow_multi_submit: true
+  auto_eval_interval_seconds: 0
+  resume_enabled: true

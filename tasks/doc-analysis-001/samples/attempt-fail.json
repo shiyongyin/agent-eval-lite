@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "task_id": "doc-analysis-001",
+  "attempt_id": "{attempt_id}",
+  "submission_type": "document",
+  "summary": "梳理了升级需要注意的变更清单",
+  "deliverable": {
+    "type": "markdown",
+    "content": "# 升级注意事项\n\n- 用户对象移除了 nickname 字段，改用 display_name。\n- 新增了异步导出中心和只读副本路由。\n- 管理后台支持深色模式。\n"
+  },
+  "sources": ["work/docs/release-v2.md"],
+  "confidence": 0.7,
+  "known_risks": [],
+  "needs_human_review": false
+}

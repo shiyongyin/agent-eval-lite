@@ -1,0 +1,57 @@
+schema_version: 1
+task_id: prd-review-001
+task_name: 评审会员积分兑换功能 PRD
+task_type: review
+description: >
+  评估 Agent 的需求评审能力：识别 PRD 中的规则缺口（过期、并发、失败补偿、风控）、
+  指出缺失的验收标准并给出可执行的补全建议。评审规则按「风险点覆盖度」给部分得分，
+  考察查全率而非碰运气命中单点。
+
+agent_brief: |
+  产品经理提交了「会员积分兑换」功能的 PRD（`prd.md`），计划下周评审后进入开发。
+  请你作为技术评审对它做一轮书面评审，交付一份 Markdown 评审意见（写入
+  `deliverable.content`），要求：
+
+  1. 指出 PRD 中**缺失或含糊、会直接导致线上事故或开发返工**的规则缺口，逐条说明风险；
+  2. 对每个缺口给出补全建议；
+  3. 单独指出 PRD 是否具备可执行的**验收标准**，若缺失请起草 3 条以上；
+  4. 用标题/列表组织内容，`sources` 引用你依据的材料。
+
+visible_context:
+  - work/prd.md
+
+allowed_tools: []
+
+submit:
+  format: json
+  schema: builtin:review
+  max_attempts: 3
+  cooldown_seconds: 0
+
+judge:
+  type: rules
+  rules_file: hidden/judge.rules.yaml
+  feedback:
+    level: failed_rules
+    include_scores: true
+
+scoring:
+  max_score: 100
+  pass_score: 80
+  selection: best_score
+  dimensions:
+    - name: risk_coverage
+      weight: 50
+    - name: acceptance_criteria
+      weight: 20
+    - name: structure
+      weight: 15
+    - name: explanation
+      weight: 15
+
+runtime:
+  timeout_minutes: 20
+  attempt_timeout_minutes: 5
+  allow_multi_submit: true
+  auto_eval_interval_seconds: 0
+  resume_enabled: true

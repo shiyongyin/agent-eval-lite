@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "task_id": "api-payload-001",
+  "attempt_id": "{attempt_id}",
+  "submission_type": "api_payload",
+  "summary": "按请求单商品逐项累加生成了订单 payload",
+  "final_payload": {
+    "order_type": "STANDARD",
+    "customer": { "customer_id": "C-8801", "level": "VIP" },
+    "items": [
+      { "sku": "SKU-A", "qty": 2, "unit_price_cents": 1250 },
+      { "sku": "SKU-B", "qty": 1, "unit_price_cents": 3000 }
+    ],
+    "total_amount_cents": 5500,
+    "currency": "CNY"
+  },
+  "evidence": [
+    { "type": "file", "source": "work/docs/request.md", "quote_or_ref": "SKU-A × 2，单价 12.50 元" }
+  ],
+  "known_risks": [],
+  "needs_human_review": false
+}

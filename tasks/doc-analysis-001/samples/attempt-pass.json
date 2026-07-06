@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "task_id": "doc-analysis-001",
+  "attempt_id": "{attempt_id}",
+  "submission_type": "document",
+  "summary": "逐版本梳理 v1→v3 升级路径上的全部破坏性变更，共 5 项，均标注来源版本与应对动作",
+  "deliverable": {
+    "type": "markdown",
+    "content": "# v1 → v3 破坏性变更清单\n\n| 变更 | 引入版本 | 影响 | 应对 |\n|---|---|---|---|\n| 用户对象移除 `nickname` 字段 | v2 | 传该字段返回 400，读取方拿不到该字段 | 切换到 `display_name` |\n| `session.timeout` 单位由秒改为毫秒 | v2 | 原值 1800 变成 1.8 秒，会话异常过期 | 既有配置值 ×1000 |\n| Java 最低版本 11 → 17 | v3 | 旧 JRE 直接启动失败 | 升级运行时到 Java 17 |\n| 默认端口 8080 → 9090 | v3 | 编排/反代指向失效 | 调整端口映射或显式配置 `server.port` |\n| 移除 `logging.legacy` 开关 | v3 | 依赖旧文本日志的采集链路失效 | 采集端切换 JSON 解析 |\n\n注：缓存 Caffeine → Redis 声明对外行为不变，不列入破坏性变更。\n"
+  },
+  "sources": ["work/docs/release-v1.md", "work/docs/release-v2.md", "work/docs/release-v3.md"],
+  "confidence": 0.9,
+  "known_risks": ["若调用方私自依赖了未文档化字段，仍可能有额外破坏点"],
+  "needs_human_review": false
+}

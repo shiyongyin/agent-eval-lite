@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "task_id": "tool-call-001",
+  "attempt_id": "{attempt_id}",
+  "submission_type": "tool_call",
+  "summary": "按常见默认等级生成了开卡 payload",
+  "final_payload": { "user_id": "u_1001", "card_type": "STANDARD" },
+  "tool_calls_used": [
+    { "tool_name": "user.lookup", "call_id": "tc_fabricated0", "purpose": "查询信用等级" }
+  ],
+  "validation_result": { "note": "未能取到等级，按默认卡种处理" },
+  "known_risks": [],
+  "needs_human_review": false
+}

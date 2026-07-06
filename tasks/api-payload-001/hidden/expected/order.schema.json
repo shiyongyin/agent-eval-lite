@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "create-order payload 结构（隐藏验收版）",
+  "type": "object",
+  "required": ["order_type", "customer", "items", "total_amount_cents", "currency"],
+  "properties": {
+    "order_type": { "enum": ["STANDARD", "EXPRESS"] },
+    "customer": {
+      "type": "object",
+      "required": ["customer_id", "level"],
+      "properties": {
+        "customer_id": { "type": "string", "minLength": 1 },
+        "level": { "enum": ["REGULAR", "VIP"] }
+      }
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["sku", "qty", "unit_price_cents"],
+        "properties": {
+          "sku": { "type": "string", "minLength": 1 },
+          "qty": { "type": "integer", "minimum": 1 },
+          "unit_price_cents": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "total_amount_cents": { "type": "integer", "minimum": 0 },
+    "currency": { "const": "CNY" }
+  }
+}

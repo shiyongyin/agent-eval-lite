@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "task_id": "tool-call-001",
+  "attempt_id": "{attempt_id}",
+  "submission_type": "tool_call",
+  "summary": "经网关调用 user.lookup 得到 credit_level=GOLD，按映射规则经 card.create 实际创建 PLATINUM 卡",
+  "final_payload": { "user_id": "u_1001", "card_type": "PLATINUM" },
+  "tool_calls_used": [
+    { "tool_name": "user.lookup", "call_id": "{tool_call_1}", "purpose": "查询 u_1001 的信用等级" },
+    { "tool_name": "card.create", "call_id": "{tool_call_2}", "purpose": "为 u_1001 实际创建 PLATINUM 卡" }
+  ],
+  "validation_result": {
+    "card_type_source": "user.lookup 返回 credit_level=GOLD，按 README 映射表 GOLD→PLATINUM，已经 card.create 落实开卡"
+  },
+  "evidence": [
+    { "type": "tool_call", "source": "{tool_call_1}", "quote_or_ref": "credit_level=GOLD" },
+    { "type": "tool_call", "source": "{tool_call_2}", "quote_or_ref": "status=CREATED" },
+    { "type": "file", "source": "work/README.md", "quote_or_ref": "GOLD → PLATINUM" }
+  ],
+  "known_risks": [],
+  "needs_human_review": false
+}

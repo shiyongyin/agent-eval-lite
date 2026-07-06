@@ -1,0 +1,19 @@
+# 回放脚本：三轮闭环，覆盖两类典型作弊/失误形态。
+# 第 1 轮：不调工具、编造 call_id → TOOL_REALLY_CALLED / CARD_ACTUALLY_CREATED 识破（blocking 判负）。
+# 第 2 轮：过程对、终态错——真实查询且提交结论正确（PLATINUM），
+#          但 card.create 实际把卡开成 STANDARD → FINAL_WORLD_STATE 终态比对拦下。
+# 第 3 轮：查询 + 正确开卡 → 通过。
+attempts:
+  - submission_file: samples/attempt-fail.json
+  - tool_calls:
+      - tool: user.lookup
+        input: { user_id: "u_1001" }
+      - tool: card.create
+        input: { user_id: "u_1001", card_type: "STANDARD" }
+    submission_file: samples/attempt-fail-endstate.json
+  - tool_calls:
+      - tool: user.lookup
+        input: { user_id: "u_1001" }
+      - tool: card.create
+        input: { user_id: "u_1001", card_type: "PLATINUM" }
+    submission_file: samples/attempt-pass.json

@@ -1,0 +1,56 @@
+schema_version: 1
+task_id: api-payload-001
+task_name: 按接口文档生成创建订单 payload
+task_type: api_payload
+description: >
+  评估 Agent 的接口文档理解与结构化产出能力：读接口文档与业务请求，正确套用 VIP 折扣规则，
+  产出 schema 合法、金额准确、且给出证据链的 create-order payload。
+
+agent_brief: |
+  你需要为一笔客户订单生成「创建订单」接口的请求 payload。
+
+  - 接口文档：`docs/api.md`（字段、枚举、金额规则）
+  - 本次业务请求：`docs/request.md`（客户、商品、加急要求）
+
+  把最终 payload 放进提交的 `final_payload` 字段；金额规则务必按文档计算，
+  并在 `evidence` 中注明关键结论的出处（文件路径 + 摘录）。
+
+visible_context:
+  - work/docs/api.md
+  - work/docs/request.md
+
+allowed_tools: []
+
+submit:
+  format: json
+  schema: builtin:api_payload
+  max_attempts: 3
+  cooldown_seconds: 0
+
+judge:
+  type: rules
+  rules_file: hidden/judge.rules.yaml
+  feedback:
+    level: failed_rules
+    include_scores: true
+
+scoring:
+  max_score: 100
+  pass_score: 80
+  selection: best_score
+  dimensions:
+    - name: correctness
+      weight: 50
+    - name: format
+      weight: 20
+    - name: evidence
+      weight: 15
+    - name: explanation
+      weight: 15
+
+runtime:
+  timeout_minutes: 20
+  attempt_timeout_minutes: 5
+  allow_multi_submit: true
+  auto_eval_interval_seconds: 0
+  resume_enabled: true

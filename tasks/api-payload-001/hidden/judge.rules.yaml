@@ -1,0 +1,50 @@
+# api-payload-001 隐藏评审规则（Agent 不可见）
+schema_version: 1
+judge_version: "1.0.0"
+
+checks:
+  - id: PAYLOAD_SCHEMA
+    type: json_schema
+    dimension: format
+    points: 20
+    blocking: true
+    severity: high
+    target: "$.final_payload"
+    schema_file: expected/order.schema.json
+    feedback_fail: final_payload 结构不符合接口文档（字段/类型/枚举检查未通过）
+
+  - id: TOTAL_AMOUNT
+    type: jsonpath_equals
+    dimension: correctness
+    points: 30
+    severity: critical
+    path: "$.final_payload.total_amount_cents"
+    expected_from: "expected/answer.json#/total_amount_cents"
+    feedback_fail: 订单总额不正确，请重读接口文档的金额规则（注意会员折扣与单位）
+
+  - id: ORDER_TYPE
+    type: jsonpath_equals
+    dimension: correctness
+    points: 20
+    severity: medium
+    path: "$.final_payload.order_type"
+    expected_from: "expected/answer.json#/order_type"
+    feedback_fail: order_type 与业务请求不符（注意加急要求）
+
+  - id: EVIDENCE_VALID
+    type: evidence_sources_valid
+    dimension: evidence
+    points: 15
+    severity: medium
+    feedback_fail: evidence 缺失或引用了任务材料之外的来源
+
+  - id: DISCOUNT_EXPLAINED
+    type: list_coverage
+    dimension: explanation
+    points: 15
+    severity: low
+    path: "$.summary"
+    min_matches: 1
+    expected_any_of:
+      - ["折", "discount", "0.9", "9折", "90%"]
+    feedback_fail: 提交说明未解释金额的计算口径（如折扣如何套用）

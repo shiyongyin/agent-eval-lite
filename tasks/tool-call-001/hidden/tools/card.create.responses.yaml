@@ -1,0 +1,8 @@
+# card.create 的 mock 应答库（Agent 不可见）
+# 写工具：模拟真实开卡系统——系统不校验"卡种是否符合业务规则"，任何结构合法的开卡请求都会成功。
+# 这正是终态比对（world_state）要兜住的口子：过程合规但把卡开错，系统照样返回 CREATED，
+# 只有比对「实际创建的卡 vs 期望终态」才能识破。
+responses: []
+default_response:
+  status: "CREATED"
+  card_id: "card_mock_0001"

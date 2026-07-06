@@ -1,0 +1,58 @@
+schema_version: 1
+task_id: doc-analysis-001
+task_name: 从版本发布说明中提取破坏性变更
+task_type: document
+description: >
+  评估 Agent 的多文档信息提取与归纳能力：在三份夹杂大量普通特性说明的 release notes 中，
+  找全破坏性变更（breaking changes）、正确标注出处版本、并以结构化 Markdown 交付。
+
+agent_brief: |
+  运维团队要从 v1 升级到 v3，需要一份「破坏性变更清单」。
+
+  - 材料：`docs/release-v1.md`、`docs/release-v2.md`、`docs/release-v3.md`
+  - 交付：Markdown 文档（写入提交的 `deliverable.content`），逐条列出升级路径上所有
+    **破坏性变更**（会导致现有调用方/配置/环境失效的变更），每条注明来源版本；
+  - 在 `sources` 中列出你实际引用过的材料文件。
+
+  注意：普通新特性、性能优化不属于破坏性变更，混入会稀释文档价值。
+
+visible_context:
+  - work/docs/release-v1.md
+  - work/docs/release-v2.md
+  - work/docs/release-v3.md
+
+allowed_tools: []
+
+submit:
+  format: json
+  schema: builtin:document
+  max_attempts: 3
+  cooldown_seconds: 0
+
+judge:
+  type: rules
+  rules_file: hidden/judge.rules.yaml
+  feedback:
+    level: failed_rules
+    include_scores: true
+
+scoring:
+  max_score: 100
+  pass_score: 80
+  selection: best_score
+  dimensions:
+    - name: coverage
+      weight: 45
+    - name: accuracy
+      weight: 25
+    - name: evidence
+      weight: 20
+    - name: format
+      weight: 10
+
+runtime:
+  timeout_minutes: 20
+  attempt_timeout_minutes: 5
+  allow_multi_submit: true
+  auto_eval_interval_seconds: 0
+  resume_enabled: true

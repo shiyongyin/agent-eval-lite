@@ -1,0 +1,69 @@
+# prd-review-001 隐藏评审规则（Agent 不可见）
+# PRD 埋设的规则缺口共 5 类：
+#   1) 积分过期/有效期未定义（获取有规则，消耗侧无过期口径）
+#   2) 并发兑换的库存与积分扣减一致性（超卖/重复扣分）
+#   3) 兑换失败/发货失败的退款回滚与补偿流程缺失
+#   4) 防刷与权限风控缺失（脚本批量兑换、黑产）
+#   5) 无验收标准（上线计划只有时间，没有可验收口径）
+#   另有记录字段缺 user_id 等次要问题，不计分。
+schema_version: 1
+judge_version: "1.0.0"
+
+checks:
+  - id: RISK_GAP_COVERAGE
+    type: list_coverage
+    dimension: risk_coverage
+    points: 50
+    severity: critical
+    path: "$.deliverable.content"
+    min_matches: 3
+    expected_any_of:
+      - ["过期", "有效期", "失效"]
+      - ["并发", "超卖", "库存扣减", "锁", "幂等"]
+      - ["回滚", "退款", "补偿", "失败处理", "冲正"]
+      - ["风控", "防刷", "限频", "黑产", "权限"]
+    feedback_fail: 关键规则缺口覆盖不足，请围绕「积分生命周期、并发一致性、失败路径、风控」再审一遍
+
+  - id: ACCEPTANCE_ADDRESSED
+    type: list_coverage
+    dimension: acceptance_criteria
+    points: 20
+    severity: high
+    path: "$.deliverable.content"
+    min_matches: 1
+    expected_any_of:
+      - ["验收标准", "验收条件", "acceptance"]
+    feedback_fail: 未指出验收标准缺失问题，也未起草可执行的验收标准
+
+  - id: HAS_STRUCTURE
+    type: jsonpath_matches
+    dimension: structure
+    points: 10
+    severity: low
+    path: "$.deliverable.content"
+    regex: "(?m)^#"
+    feedback_fail: 评审意见缺少标题结构，不便评审会逐条过
+
+  - id: DELIVERABLE_IS_MARKDOWN
+    type: jsonpath_equals
+    dimension: structure
+    points: 5
+    severity: low
+    path: "$.deliverable.type"
+    expected: "markdown"
+    feedback_fail: deliverable.type 应为 markdown
+
+  - id: SOURCES_VALID
+    type: evidence_sources_valid
+    dimension: explanation
+    points: 10
+    severity: medium
+    feedback_fail: sources 缺失或引用了任务材料之外的路径
+
+  - id: CONFIDENCE_GIVEN
+    type: jsonpath_exists
+    dimension: explanation
+    points: 5
+    severity: low
+    path: "$.confidence"
+    feedback_fail: 缺少置信度自评
