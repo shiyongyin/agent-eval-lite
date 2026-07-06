@@ -19,9 +19,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 工具网关：Agent 调用外部能力的唯一合法通道（allowlist + mock 应答 + 全量留痕）。
+ * 工具网关：Agent 调用外部能力的唯一合法通道（allowlist + mock/真实后端 + 全量留痕）。
  *
- * <p>Phase 1 的工具一律 mock——应答库在 {@code hidden/tools/<name>.responses.yaml}：
+ * <p>默认（replay 模式）应答取自 {@code hidden/tools/<name>.responses.yaml}：
  * <pre>{@code
  * responses:
  *   - match: {user_id: "u_1001"}   # 子集匹配：match 的每个字段与输入相应字段深度相等
@@ -29,7 +29,12 @@ import java.util.Map;
  * default_response: {...}          # 可选兜底
  * }</pre>
  * 首个命中的 match 生效；均未命中且无兜底时返回 {@code no_fixture} 失败。
- * mock 保证评估确定性、可复现、零外部依赖；真实 HTTP/MCP 工具是 Phase 3 的扩展点。
+ * 应答库保证评估确定性、可复现、零外部依赖。
+ *
+ * <p>Phase 3 真实工具：任务在 {@code allowed_tools[].backend} 声明 http 后端后，
+ * 运行方以 {@code AEL_TOOL_MODE=live} 开启真实外呼（{@link ToolHttpBackend}，
+ * 响应自动存档可晋升为应答库）；默认 replay 模式下后端声明被忽略、仍走应答库，
+ * CI 永远确定性。模式语义见 {@link ToolMode}。
  *
  * <p>网关通常运行在独立进程（Agent 执行 {@code agent-eval tool call}），
  * 凭 {@code AEL_RUN_DIR} → meta.json 还原任务上下文，trace 以 append 方式续写。
@@ -46,12 +51,16 @@ public final class ToolGateway {
     private final Path taskDir;
     private final TaskSpec spec;
     private final TraceLogger trace;
+    private final ToolMode mode;
+    private final ToolHttpBackend httpBackend;
 
     private ToolGateway(Path runDir, Path taskDir, TaskSpec spec, TraceLogger trace) {
         this.runDir = runDir;
         this.taskDir = taskDir;
         this.spec = spec;
         this.trace = trace;
+        this.mode = ToolMode.current();
+        this.httpBackend = new ToolHttpBackend(runDir.resolve("tools"));
     }
 
     /**
@@ -87,7 +96,7 @@ public final class ToolGateway {
     }
 
     /**
-     * 执行一次工具调用（allowlist 检查 → mock 匹配 → 留痕）。
+     * 执行一次工具调用（allowlist 检查 → 按模式取应答库或真实外呼 → 留痕）。
      *
      * @param toolName 工具名
      * @param input 调用入参
@@ -95,24 +104,52 @@ public final class ToolGateway {
      */
     public ToolCallResult call(String toolName, JsonNode input) {
         String callId = newCallId();
-        boolean allowed = spec.allowedTools().stream().anyMatch(t -> t.name().equals(toolName));
-        if (!allowed) {
-            logCall(callId, toolName, input, false, null, "tool_not_allowed");
+        TaskSpec.AllowedTool tool = spec.allowedTools().stream()
+                .filter(t -> t.name().equals(toolName))
+                .findFirst()
+                .orElse(null);
+        if (tool == null) {
+            logCall(callId, toolName, input, false, true, null, "tool_not_allowed");
             return new ToolCallResult(callId, false, null,
                     "工具未在本任务的 allowlist 中: " + toolName);
         }
+
+        // live 模式 + 后端声明 = 真实外呼（响应自动存档）；其余一律走确定性应答库。
+        if (mode == ToolMode.LIVE && tool.backend() != null) {
+            ToolHttpBackend.Result result = httpBackend.call(toolName, tool.backend(), input);
+            if (result.error() != null) {
+                logCall(callId, toolName, input, false, false, null, result.error());
+                return new ToolCallResult(callId, false, null,
+                        "真实后端调用失败: " + result.error());
+            }
+            logCall(callId, toolName, input, true, false, result.response(), null);
+            return new ToolCallResult(callId, true, result.response(), null);
+        }
+
         JsonNode response = matchFixture(toolName, input);
         if (response == null) {
-            logCall(callId, toolName, input, false, null, "no_fixture");
+            String error = tool.backend() != null && !hasFixture(toolName)
+                    ? "no_replay_archive" : "no_fixture";
+            logCall(callId, toolName, input, false, true, null, error);
             return new ToolCallResult(callId, false, null,
-                    "mock 应答库中没有匹配该输入的应答: " + toolName);
+                    "no_replay_archive".equals(error)
+                            ? "后端工具尚无 replay 应答库（先用 AEL_TOOL_MODE=live 录制并晋升存档）: " + toolName
+                            : "mock 应答库中没有匹配该输入的应答: " + toolName);
         }
-        logCall(callId, toolName, input, true, response, null);
+        logCall(callId, toolName, input, true, true, response, null);
         return new ToolCallResult(callId, true, response, null);
+    }
+
+    private boolean hasFixture(String toolName) {
+        return Files.isRegularFile(taskDir.resolve("hidden/tools/" + toolName + ".responses.yaml"));
     }
 
     private JsonNode matchFixture(String toolName, JsonNode input) {
         Path fixtureFile = taskDir.resolve("hidden/tools/" + toolName + ".responses.yaml");
+        if (!Files.isRegularFile(fixtureFile)) {
+            // 只有声明了后端的工具才可能走到这里（加载器豁免了它的应答库必填），按未命中处理。
+            return null;
+        }
         JsonNode root;
         try {
             root = Jsons.yaml().readTree(Files.readString(fixtureFile, StandardCharsets.UTF_8));
@@ -139,13 +176,13 @@ public final class ToolGateway {
     }
 
     private void logCall(String callId, String toolName, JsonNode input,
-                         boolean success, JsonNode output, String errorCode) {
+                         boolean success, boolean mock, JsonNode output, String errorCode) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("call_id", callId);
         payload.put("tool_name", toolName);
         payload.put("input", input);
         payload.put("success", success);
-        payload.put("mock", true);
+        payload.put("mock", mock);
         if (output != null) {
             String summary = output.toString();
             payload.put("output_summary", summary.length() > 2048 ? summary.substring(0, 2048) + "…" : summary);

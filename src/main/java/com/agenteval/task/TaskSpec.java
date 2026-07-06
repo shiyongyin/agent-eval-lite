@@ -1,6 +1,7 @@
 package com.agenteval.task;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 任务规格（task.yaml 的强类型形态）——一次评估的单一事实来源。
@@ -46,10 +47,45 @@ public record TaskSpec(
     /**
      * 允许调用的工具声明。
      *
+     * <p>{@code backend} 为可选的真实 HTTP 后端声明（Phase 3）：未声明时工具只有 mock 应答库
+     * 一条通道；声明后，运行方可用 {@code AEL_TOOL_MODE=live} 让网关真实外呼并存档响应。
+     * 白名单语义：Agent 的调用入参永远只作为请求负载，<strong>无法改变外呼目标</strong>——
+     * 可达的 URL 只有任务作者在此声明的这一个。
+     *
      * @param name 工具名（如 {@code user.lookup}）
      * @param description 用途描述（渲染进 instructions）
+     * @param backend 真实 HTTP 后端声明（可为 {@code null}=纯 mock 工具）
      */
-    public record AllowedTool(String name, String description) {
+    public record AllowedTool(String name, String description, HttpBackend backend) {
+
+        /**
+         * 兼容构造器：纯 mock 工具（无真实后端）。
+         *
+         * @param name 工具名
+         * @param description 用途描述
+         */
+        public AllowedTool(String name, String description) {
+            this(name, description, null);
+        }
+    }
+
+    /**
+     * 工具的真实 HTTP 后端声明（task.yaml 的 {@code allowed_tools[].backend}，{@code type: http}）。
+     *
+     * <p>安全口径：URL / method / headers 全部由任务作者静态声明，Agent 入参只充当请求体
+     * （POST）或查询参数（GET），不存在任何「入参拼进 URL」的通道。header 值支持
+     * {@code ${ENV:NAME}} 占位符——凭证从框架进程环境变量解析，永不写进任务文件或渲染给 Agent。
+     *
+     * @param url 后端完整 URL（唯一可达目标，即白名单本身）
+     * @param method HTTP 方法（{@code POST}=入参作 JSON 请求体；{@code GET}=入参顶层标量作查询参数）
+     * @param headers 附加请求头（值可含 {@code ${ENV:NAME}} 占位符）
+     * @param timeoutSeconds 单次外呼超时秒数
+     */
+    public record HttpBackend(String url, String method, Map<String, String> headers, int timeoutSeconds) {
+
+        public HttpBackend {
+            headers = headers == null ? Map.of() : Map.copyOf(headers);
+        }
     }
 
     /**

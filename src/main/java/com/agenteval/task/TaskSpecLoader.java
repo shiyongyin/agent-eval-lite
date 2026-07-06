@@ -7,8 +7,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -80,7 +82,8 @@ public final class TaskSpecLoader {
                 errors.add("allowed_tools 中存在缺少 name 的条目");
                 continue;
             }
-            allowedTools.add(new TaskSpec.AllowedTool(name, item.path("description").asText("")));
+            allowedTools.add(new TaskSpec.AllowedTool(name, item.path("description").asText(""),
+                    parseBackend(name, item.path("backend"), errors)));
         }
 
         JsonNode submitNode = root.path("submit");
@@ -131,6 +134,39 @@ public final class TaskSpecLoader {
         }
         return new TaskSpec(schemaVersion, taskId, taskName, taskType, description, agentBrief,
                 visibleContext, allowedTools, submit, judge, scoring, runtime);
+    }
+
+    /**
+     * 解析工具的真实后端声明（{@code backend} 节点缺失时返回 {@code null}=纯 mock 工具）。
+     */
+    private static TaskSpec.HttpBackend parseBackend(String toolName, JsonNode node, List<String> errors) {
+        if (node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        String type = node.path("type").asText("");
+        if (!"http".equals(type)) {
+            errors.add("工具 " + toolName + " 的 backend.type 仅支持 http，实际为: " + type);
+            return null;
+        }
+        String url = node.path("url").asText("");
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            errors.add("工具 " + toolName + " 的 backend.url 必须是完整的 http(s) URL: " + url);
+            return null;
+        }
+        String method = node.path("method").asText("POST").toUpperCase(Locale.ROOT);
+        if (!"POST".equals(method) && !"GET".equals(method)) {
+            errors.add("工具 " + toolName + " 的 backend.method 仅支持 POST / GET: " + method);
+            return null;
+        }
+        Map<String, String> headers = new LinkedHashMap<>();
+        node.path("headers").properties()
+                .forEach(entry -> headers.put(entry.getKey(), entry.getValue().asText()));
+        int timeoutSeconds = node.path("timeout_seconds").asInt(30);
+        if (timeoutSeconds <= 0) {
+            errors.add("工具 " + toolName + " 的 backend.timeout_seconds 必须 > 0");
+            return null;
+        }
+        return new TaskSpec.HttpBackend(url, method, headers, timeoutSeconds);
     }
 
     private static void validateSemantics(TaskSpec spec, Path taskDir, List<String> errors) {
@@ -189,10 +225,11 @@ public final class TaskSpecLoader {
             errors.add("submit.schema 引用的文件不存在: " + schema);
         }
 
-        // 工具 mock 应答库（Phase 1 工具一律 mock，应答库缺失 = 任务不可运行）。
+        // 工具 mock 应答库：纯 mock 工具缺失即任务不可运行；声明了真实后端的工具允许暂缺
+        // （首次可用 AEL_TOOL_MODE=live 录制存档，再晋升为 replay 应答库——validate 会提示）。
         for (TaskSpec.AllowedTool tool : spec.allowedTools()) {
             Path fixture = taskDir.resolve("hidden/tools/" + tool.name() + ".responses.yaml");
-            if (!Files.isRegularFile(fixture)) {
+            if (tool.backend() == null && !Files.isRegularFile(fixture)) {
                 errors.add("工具 " + tool.name() + " 缺少 mock 应答库: hidden/tools/" + tool.name() + ".responses.yaml");
             }
         }
