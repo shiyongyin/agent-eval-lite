@@ -65,11 +65,12 @@ Work/Judge 隔离是项目的核心边界。Agent 只应看到复制后的 `work
 
 安全硬化也继续推进。`RulesJudge` 新增 `world_state` 终态比对能力，复用签名可信的成功 `tool_call` 事件重放世界终态；工具调用核验仍以 HMAC trace 为信任边界。`no_canary_leak` 已覆盖 `workspace/`、`agent-logs/`、`inbox/` 和 `traces/`，能抓住通过工具入参夹带 canary 的外泄路径。
 
-已验证命令：
+已验证命令（2026-07-07 复核）：
 
-- `mvn -q clean test`：通过，93 个测试。
+- `mvn -q -B clean verify`：通过，112 个测试，JaCoCo 指令覆盖率 0.7798（门禁下限 0.75），Checkstyle 无违规。
 - `bin/agent-eval suite --tasks-root tasks --fail-on-not-passed`：通过，5/5 任务稳定通过。
-- `bash redteam/run_all.sh`：通过，12 DEFENDED / 1 登记基线 VULNERABLE。
+- `bash redteam/run_all.sh`：通过，14 项中 13 DEFENDED / 1 登记基线 VULNERABLE，INFRA=0 / CHECK=0。
+- `bash redteam/test_gate.sh`：通过，门禁判定 fail-closed 契约 7 用例自测全绿。
 - `bash bin/ci-smoke.sh`：通过，四道门禁闭环。
 
 仍需关注：本地同用户文件系统下，Agent 外科式读取 `hidden/` 后只抄答案值仍不可检测，需 Docker Runner 或等价挂载隔离根治。红队脚本目前允许 1 个登记基线漏洞；新增漏洞只要超过 `RT_ALLOWED_VULN` 才会让门禁失败。

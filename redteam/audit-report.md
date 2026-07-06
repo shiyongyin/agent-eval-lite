@@ -1,5 +1,7 @@
 # AgentEval-Lite 红队审计报告
 
+> **时点声明**：本报告是红队套件初建期（矩阵 10 项，对应提交 `2092e70`）的审计快照，正文保留当时结论、不做改写。其后框架已扩充 G / H / D2 / I 四类攻击用例并完成门禁 fail-closed 化，当前矩阵为 **14 项：13 DEFENDED / 1 VULNERABLE（登记基线）**。最新复核结果与逐项时效性修正见文末第 11 节「复审更新」。
+
 ## 1. 执行摘要
 
 当前框架处于“可内部试用”阶段：核心 TaskSpec、Runner、Submission、Judge、Trace、Tool Gateway、Report、多轮反馈和 Resume 都已可运行，且大部分攻击用例已有防护。
@@ -160,3 +162,42 @@
 3. 能给真实 Agent 做内部评估：可以，但不能把安全隔离结论当真。
 4. 能接真实业务流程：不建议，缺少强隔离和真实工具权限治理。
 5. 距离成熟框架还差：容器级隔离、OS 级文件/网络权限控制、CI 红队门禁、多 Agent 对比、真实工具治理和更强 trace 防篡改。
+
+## 11. 复审更新（2026-07-07，红队 14 项时期）
+
+本节记录快照之后的演进与复核结果，并逐项修正正文中已过时的结论；正文其余部分保留为历史证据。
+
+### 11.1 当前实测状态（全部复跑验证）
+
+| 命令 | 结果 |
+|---|---|
+| `mvn -q -B clean verify` | 通过：112 个测试全绿，JaCoCo 指令覆盖率 0.7798（≥ 0.75 门禁），Checkstyle 无违规 |
+| `bin/agent-eval suite --tasks-root tasks --fail-on-not-passed` | 通过：5/5 任务稳定通过 |
+| `bash redteam/run_all.sh` | 14 项：13 DEFENDED / 1 VULNERABLE（登记基线：红队 A 外科式偷看）/ INFRA=0 / CHECK=0 |
+| `bash redteam/test_gate.sh` | 门禁判定 fail-closed 契约自测 7/7 通过 |
+| `RT_ALLOWED_VULN=0 bash redteam/run_all.sh` | 负向验证：退出码 1，门禁按预期拦截基线外 VULNERABLE |
+| `bash bin/ci-smoke.sh` | 四道门禁全部通过 |
+
+### 11.2 快照后新增的防护（均已 DEFENDED）
+
+- **G 越权工具调用**：网关按任务 allowlist 拒绝并留痕 `tool_not_allowed`，`tool_call_required` 一票否决。
+- **H 工具入参夹带 canary 外泄**：canary 扫描面扩到 `traces/`，经网关入参外传被检出。
+- **D2 PASS_TO_PASS 回归**（借鉴 SWE-bench）：修好目标缺陷却改坏既有 `maxPrice` 行为，被隐藏行为规格一票否决。
+- **I 过程对终态错**（借鉴 tau-bench）：`world_state` check 把签名可信且成功的写工具调用折叠为世界终态与期望比对，「流程对、提交对、终态错」被一票否决。
+- **门禁 fail-closed 化**：`VULNERABLE` 超出登记基线 `RT_ALLOWED_VULN`（默认 1）、或出现 INFRA / CHECK 即失败；每次运行产出结构化工件 `runs/redteam/redteam_report.json`；判定逻辑抽为 `redteam/gate_lib.sh` 纯函数并配 `redteam/test_gate.sh` 正/负向自测，已接入 `.github/workflows/ci.yml` 与 `bin/ci-smoke.sh`。
+
+### 11.3 正文时效性修正
+
+| 正文位置 | 快照结论 | 当前状态 |
+|---|---|---|
+| §1 / §2 | 红队矩阵 9 DEFENDED / 1 VULNERABLE | 14 项：13 DEFENDED / 1 VULNERABLE（登记基线残留） |
+| §3 未实现清单 | 多 Agent 对比报告未实现 | 已实现：`suite --agents-file` 任务×Agent 矩阵 + pass^k 可靠性 + 排名面板 |
+| §5 CI/回归 扣分项 | 无 CI 配置文件 | `.github/workflows/ci.yml` 与 `bin/ci-smoke.sh` 已落地（测试/体检/套件/红队四步） |
+| §6 P2 | 没有多 Agent 横向对比报告 | 已完成（同上） |
+| §9 行动计划 | 第 2 条（红队接入 CI）、第 4 条（对比报告）待做 | 均已完成；第 5 条 trace 完整性已部分覆盖（截断/删除检测） |
+
+### 11.4 维持不变的结论
+
+- **P0 未修**：外科式偷看 hidden（红队 A）仍是登记基线残留——同机同用户文件系统下无法根治，仍需 §9 第 1 条 Docker Runner（Agent 容器只挂载 workspace/inbox/feedback）落地，这是通往「强对抗可信」的唯一必修项。
+- §3 未实现清单中的容器级强隔离、真实 HTTP AgentAdapter、真实工具权限模型、auto-eval 后台采样、LLM judge 防注入仍未实现（HTTP Adapter 为 Phase 2 首项）。
+- command nonce 非密码学强度、run 结束后产物篡改两处残余风险声明继续有效（见 README「安全边界」）。
