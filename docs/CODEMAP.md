@@ -9,7 +9,9 @@
 
 | 命令 | 说明 | 源文件 |
 | --- | --- | --- |
-| `agent-eval` | 轻量级通用 AI Agent 评估框架（AgentEval-Lite） | `com/agenteval/cli/Main.java` |
+| `agent-eval` | 企业内部 AI Agent 测试脚手架（AgentEval-Lite） | `com/agenteval/cli/Main.java` |
+| `evalset` | 私有测评集工程化辅助 | `com/agenteval/cli/EvalsetCommand.java` |
+| `evalset init` | 生成私有测评集骨架（tasks/、agents.yaml、接入脚本与落地说明） | `com/agenteval/cli/EvalsetCommand.java` |
 | `export` | 导出 run 的 trace 为 OTLP/OpenInference JSON（可选直接 POST 到看板） | `com/agenteval/cli/ExportCommand.java` |
 | `history` | 汇总 runs/ 历次评估产出跨 run / Agent / 版本的趋势报告（只读离线聚合） | `com/agenteval/cli/HistoryCommand.java` |
 | `judge` | 对一份提交离线判分（可复现复核） | `com/agenteval/cli/JudgeCommand.java` |
@@ -51,6 +53,7 @@
 
 | 类 | 职责（Javadoc 首句） |
 | --- | --- |
+| `EvalsetCommand` | agent-eval evalset：私有测评集工程化辅助（当前提供 init 脚手架）。 |
 | `ExportCommand` | agent-eval export：把 run 的 trace.jsonl 导出为 OTLP/OpenInference JSON，供 Arize Phoenix / Langfuse / 任意 OTel Collector 摄取（外接看板，不自建可视化）。 |
 | `HistoryCommand` | agent-eval history：汇总 runs/ 下历次评估的 report.json，产出「跨 run / 跨 Agent / 跨版本」的趋势报告（JSON + Markdown）。 |
 | `JudgeCommand` | agent-eval judge：离线判分——不跑 Agent，直接对一份提交复算分数。 |
@@ -175,6 +178,7 @@
 
 | 测试类 | 覆盖点（Javadoc 首句） |
 | --- | --- |
+| `EvalsetInitScaffoldTest` | evalset init 脚手架端到端回归：生成的小团队私有测评集骨架必须可读、可解析、不覆盖已有目录，并给后续 task init / suite --agents-file 留出正确接线点。 |
 | `HistoryCommandTest` | agent-eval history 聚合回归：跨 run 汇总 report.json，产出 (任务 × Agent) 趋势；红队攻击 run（runs/redteam/ 下）不计入趋势，但其门禁摘要被并入报告。 |
 | `SuiteCommandAgentsFileTest` | --agents-file 多 Agent 对比配置的解析回归：合法配置解析出正确规格，非法配置（缺 cmd、类型不合法、标签重复、空列表）给出可读错误而非跑一半才崩。 |
 | `ValidateLintTest` | 规则深度 lint 回归：把「run 时才会炸的规则配置错误」（expected_from 断链、schema_file 缺失、要求调用白名单外工具）前移到 validate 静态阶段拦截；内置任务必须全部通过 lint。 |
@@ -313,4 +317,4 @@
 
 ---
 
-统计：生产类 73 个 · 测试类 32 个。缺 Javadoc 的类会在上表显式标记（本地图以 Javadoc 首句为数据源，请随手补齐）。
+统计：生产类 74 个 · 测试类 33 个。缺 Javadoc 的类会在上表显式标记（本地图以 Javadoc 首句为数据源，请随手补齐）。

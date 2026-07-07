@@ -1,0 +1,10 @@
+# 私有测评集多 Agent 对比清单（suite --agents-file 用）。
+agents:
+  - label: baseline-scripted
+    type: scripted
+  - label: current
+    type: cli
+    cmd: 'bash "$AEL_RUN_DIR/../../../scripts/run-agent.sh" current'
+  - label: candidate
+    type: cli
+    cmd: 'bash "$AEL_RUN_DIR/../../../scripts/run-agent.sh" candidate'

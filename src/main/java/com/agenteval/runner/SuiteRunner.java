@@ -21,8 +21,11 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -129,10 +132,14 @@ public final class SuiteRunner {
      * @param totalTokens Agent 自报 token 总量（未上报为 {@code null}）
      * @param runId run id
      * @param runDir run 目录
+     * @param failedRuleIds 本次 run 最佳轮次仍失败的公开 rule_id 清单（不含 hidden 细节）
      */
     public record RunAttempt(int index, RunStatus status, boolean passed, Double score,
                              long durationMs, Double costUsd, Long totalTokens,
-                             String runId, Path runDir) {
+                             String runId, Path runDir, List<String> failedRuleIds) {
+        public RunAttempt {
+            failedRuleIds = failedRuleIds == null ? List.of() : List.copyOf(failedRuleIds);
+        }
     }
 
     /**
@@ -245,6 +252,18 @@ public final class SuiteRunner {
                     .filter(java.util.Objects::nonNull).toList();
             return reported.isEmpty() ? null
                     : reported.stream().mapToLong(Long::longValue).sum();
+        }
+
+        /**
+         * 聚合该任务各次重复中出现过的失败 rule_id（去重且保持出现顺序）。
+         *
+         * @return 失败规则清单
+         */
+        public List<String> failedRuleIds() {
+            return runs.stream()
+                    .flatMap(a -> a.failedRuleIds().stream())
+                    .distinct()
+                    .toList();
         }
     }
 
@@ -482,12 +501,13 @@ public final class SuiteRunner {
                 RunManager.RunOutcome outcome = RunManager.run(
                         taskDir, runsRoot, modelName, agent.factory().apply(taskDir));
                 long durationMs = (System.nanoTime() - start) / 1_000_000;
-                JsonNode cost = readRunCost(outcome.runDir());
+                JsonNode runReport = readRunReport(outcome.runDir());
+                JsonNode cost = readRunCost(runReport);
                 runs.add(new RunAttempt(i, outcome.status(), outcome.status() == RunStatus.PASSED,
                         outcome.bestScore(), durationMs,
                         cost == null ? null : cost.path("cost_usd").asDouble(0),
                         cost == null ? null : cost.path("total_tokens").asLong(0),
-                        outcome.runId(), outcome.runDir()));
+                        outcome.runId(), outcome.runDir(), readFailedRuleIds(runReport)));
             }
             TaskResult result = new TaskResult(taskId, taskDir, spec.scoring().passScore(),
                     spec.scoring().maxScore(), List.copyOf(runs), null);
@@ -501,24 +521,56 @@ public final class SuiteRunner {
     }
 
     /**
-     * 读取单次 run 报告中的自报成本节点（未上报或报告缺失时为 {@code null}）。
+     * 读取单次 run 报告（缺失或不可读时为 {@code null}）。
      *
      * @param runDir run 目录
-     * @return {@code report.json} 的 cost 节点；无上报时 {@code null}
+     * @return {@code report.json} 根节点
      */
-    private static JsonNode readRunCost(Path runDir) {
+    private static JsonNode readRunReport(Path runDir) {
         Path reportFile = runDir.resolve("report/report.json");
         if (!Files.isRegularFile(reportFile)) {
             return null;
         }
         try {
-            JsonNode cost = Jsons.json()
-                    .readTree(Files.readString(reportFile, StandardCharsets.UTF_8))
-                    .path("cost");
-            return cost.path("reported").asBoolean(false) ? cost : null;
+            return Jsons.json().readTree(Files.readString(reportFile, StandardCharsets.UTF_8));
         } catch (IOException e) {
-            log.warn("读取 run 报告 cost 失败（忽略）: {}", reportFile);
+            log.warn("读取 run 报告失败（忽略）: {}", reportFile);
             return null;
+        }
+    }
+
+    private static JsonNode readRunCost(JsonNode report) {
+        if (report == null) {
+            return null;
+        }
+        JsonNode cost = report.path("cost");
+        return cost.path("reported").asBoolean(false) ? cost : null;
+    }
+
+    private static List<String> readFailedRuleIds(JsonNode report) {
+        if (report == null) {
+            return List.of();
+        }
+        List<String> ids = new ArrayList<>();
+        JsonNode bestAttempt = report.path("best_attempt");
+        if (!bestAttempt.isMissingNode() && !bestAttempt.isNull()) {
+            JsonNode bestFailed = bestAttempt.path("failed_rules");
+            bestFailed.forEach(rule -> {
+                String id = rule.path("rule_id").asText("");
+                if (!id.isBlank()) {
+                    ids.add(id);
+                }
+            });
+            return ids.stream().distinct().toList();
+        } else {
+            report.path("attempts").forEach(attempt ->
+                    attempt.path("failed_rule_ids").forEach(id -> {
+                        String value = id.asText("");
+                        if (!value.isBlank()) {
+                            ids.add(value);
+                        }
+                    }));
+            return ids.stream().distinct().toList();
         }
     }
 
@@ -621,7 +673,32 @@ public final class SuiteRunner {
         for (TaskResult r : result.results()) {
             results.add(taskJson(r, result.repeat()));
         }
+        root.set("risk_summary", buildRiskSummary(result));
         return root;
+    }
+
+    private static ObjectNode buildRiskSummary(SuiteResult result) {
+        ObjectNode summary = Jsons.json().createObjectNode();
+        ArrayNode notPassed = summary.putArray("not_passed_tasks");
+        ArrayNode setupErrors = summary.putArray("setup_error_tasks");
+        ArrayNode flaky = summary.putArray("flaky_tasks");
+        Map<String, Integer> byRule = new TreeMap<>();
+        for (TaskResult r : result.results()) {
+            if (!r.passAtK()) {
+                notPassed.add(r.taskId());
+            }
+            if (r.error() != null || r.runs().stream().anyMatch(a ->
+                    a.status() == RunStatus.ERROR || a.status() == RunStatus.INTEGRITY_BROKEN)) {
+                setupErrors.add(r.taskId());
+            }
+            if (result.repeat() > 1 && r.passAt1() && !r.passAtK()) {
+                flaky.add(r.taskId());
+            }
+            r.runs().forEach(a -> a.failedRuleIds().forEach(rule -> byRule.merge(rule, 1, Integer::sum)));
+        }
+        summary.set("failed_rules_by_id", Jsons.json().valueToTree(new LinkedHashMap<>(byRule)));
+        summary.put("action_required", notPassed.size() > 0 || setupErrors.size() > 0);
+        return summary;
     }
 
     private static ObjectNode taskJson(TaskResult r, int repeat) {
@@ -643,6 +720,7 @@ public final class SuiteRunner {
         node.put("avg_duration_ms", r.avgDurationMs());
         putNullable(node, "total_cost_usd", r.totalCostUsd());
         putNullableLong(node, "total_tokens", r.totalTokens());
+        node.set("failed_rule_ids", Jsons.json().valueToTree(r.failedRuleIds()));
         if (r.error() == null) {
             node.putNull("error");
         } else {
@@ -663,6 +741,8 @@ public final class SuiteRunner {
             putNullable(rn, "cost_usd", a.costUsd());
             putNullableLong(rn, "total_tokens", a.totalTokens());
             rn.put("run_id", a.runId() == null ? "" : a.runId());
+            rn.put("run_dir", a.runDir() == null ? "" : a.runDir().toString());
+            rn.set("failed_rule_ids", Jsons.json().valueToTree(a.failedRuleIds()));
         }
         return node;
     }
@@ -741,6 +821,8 @@ public final class SuiteRunner {
         }
         sb.append("\n");
 
+        appendSuiteActionSummary(sb, report);
+
         sb.append("## 逐任务明细\n\n");
         if (repeat > 1) {
             sb.append("| 任务 | pass^k | pass@1 | 通过次数 | 最佳分 | 通过线 | 平均耗时(ms) |\n");
@@ -768,6 +850,40 @@ public final class SuiteRunner {
         sb.append("\n");
         appendErrors(sb, report.path("results"));
         return sb.toString();
+    }
+
+    private static void appendSuiteActionSummary(StringBuilder sb, ObjectNode report) {
+        JsonNode risk = report.path("risk_summary");
+        if (risk.isMissingNode()) {
+            return;
+        }
+        sb.append("## 小团队操作摘要\n\n");
+        if (!risk.path("action_required").asBoolean(false)) {
+            sb.append("- 当前没有未稳定通过任务或框架故障；可把本次 suite 作为当前基线。\n");
+        } else {
+            sb.append("- 未稳定通过任务：").append(formatTaskList(risk.path("not_passed_tasks"))).append("\n");
+            sb.append("- 框架故障 / 完整性异常任务：").append(formatTaskList(risk.path("setup_error_tasks"))).append("\n");
+            sb.append("- flaky 任务（pass@1 过但 pass^k 未过）：")
+                    .append(formatTaskList(risk.path("flaky_tasks"))).append("\n");
+        }
+        JsonNode rules = risk.path("failed_rules_by_id");
+        if (rules.isObject() && !rules.isEmpty()) {
+            sb.append("- 失败规则热点：");
+            boolean first = true;
+            var fields = rules.fields();
+            while (fields.hasNext()) {
+                var entry = fields.next();
+                if (!first) {
+                    sb.append("，");
+                }
+                first = false;
+                sb.append("`").append(entry.getKey()).append("` × ").append(entry.getValue().asInt());
+            }
+            sb.append("\n");
+        } else {
+            sb.append("- 失败规则热点：无\n");
+        }
+        sb.append("\n");
     }
 
     // ---------------------------------------------------------------- markdown（对比）
@@ -803,6 +919,8 @@ public final class SuiteRunner {
         }
         sb.append("\n");
 
+        appendComparisonHotspots(sb, result);
+
         // 任务 × Agent 明细矩阵（单元格为 pass^k 与最佳分）。
         sb.append("## 任务 × Agent 矩阵（pass^k · 最佳分）\n\n");
         sb.append("| 任务 |");
@@ -825,6 +943,29 @@ public final class SuiteRunner {
         }
         sb.append("\n");
         return sb.toString();
+    }
+
+    private static void appendComparisonHotspots(StringBuilder sb, ComparisonResult result) {
+        List<String> failedByAll = new ArrayList<>();
+        List<String> splitTasks = new ArrayList<>();
+        for (String taskId : result.taskIds()) {
+            long pass = result.perAgent().stream()
+                    .map(s -> s.results().stream()
+                            .filter(t -> t.taskId().equals(taskId)).findFirst().orElse(null))
+                    .filter(java.util.Objects::nonNull)
+                    .filter(TaskResult::passAtK)
+                    .count();
+            if (pass == 0) {
+                failedByAll.add(taskId);
+            } else if (pass < result.perAgent().size()) {
+                splitTasks.add(taskId);
+            }
+        }
+        sb.append("## 失败热点\n\n");
+        sb.append("- 全部 Agent 都未稳定通过：").append(formatIds(failedByAll))
+                .append("（优先检查任务说明、judge 规则或环境）\n");
+        sb.append("- Agent 之间有区分度：").append(formatIds(splitTasks))
+                .append("（优先用于选型和回归定位）\n\n");
     }
 
     private static String cell(TaskResult r) {
@@ -864,6 +1005,22 @@ public final class SuiteRunner {
     private static String scoreCell(com.fasterxml.jackson.databind.JsonNode r) {
         return r.path("score").isNull() ? "—"
                 : r.path("score").asDouble() + "/" + r.path("max_score").asInt();
+    }
+
+    private static String formatTaskList(com.fasterxml.jackson.databind.JsonNode tasks) {
+        if (!tasks.isArray() || tasks.isEmpty()) {
+            return "无";
+        }
+        List<String> ids = new ArrayList<>();
+        tasks.forEach(task -> ids.add("`" + task.asText() + "`"));
+        return String.join(", ", ids);
+    }
+
+    private static String formatIds(List<String> ids) {
+        if (ids.isEmpty()) {
+            return "无";
+        }
+        return ids.stream().map(id -> "`" + id + "`").collect(java.util.stream.Collectors.joining(", "));
     }
 
     private static String row(String key, String value) {

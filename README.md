@@ -95,6 +95,13 @@ bin/agent-eval run --task tasks/api-payload-001 --agent scripted \
 cat runs/api-payload-001/run_*/report/report.md
 ```
 
+初始化团队自己的私有测评集：
+
+```bash
+bin/agent-eval evalset init --id my-agent
+bin/agent-eval task init --id first-task-001 --tasks-root evalsets/my-agent/tasks
+```
+
 一键本地门禁：
 
 ```bash
@@ -171,9 +178,33 @@ bin/agent-eval suite --tier smoke --fail-on-not-passed
 bin/agent-eval history --runs-root runs
 ```
 
-`suite` 会生成 `suite_report.json` 和 `suite_report.md`，包含任务矩阵、稳定通过数、平均耗时和可选 usage 成本聚合。
+`suite` 会生成 `suite_report.json` 和 `suite_report.md`，包含小团队操作摘要、任务矩阵、稳定通过数、失败规则热点、平均耗时和可选 usage 成本聚合。
 
 `evalsets/demo-ops-agent/` 提供了一个完整私有测评集示例，包含两个任务、三个 Agent 和对比面板命令。
+
+## 小团队落地
+
+没有具体业务场景时，先补通用脚手架，不要硬造假业务题库：
+
+```bash
+bin/agent-eval evalset init --id my-agent
+```
+
+生成的 `evalsets/my-agent/` 包含：
+
+- `agents.yaml`：scripted 基线、current、candidate 三方横评清单。
+- `scripts/run-agent.sh`：团队 Agent 接入包装器。
+- `tasks/`：私有任务库入口。
+- `README.md`：本集合的标准命令。
+
+推荐路线：
+
+1. 先做 5-10 个 `smoke` 任务，保证每次改 Agent 能快速挡退化。
+2. 再扩到 20-50 个 `regression` 任务，合并前或发版前跑。
+3. 每个任务进入门禁前，用 `ael-review-task-quality` 或 [docs/07-任务质量清单.md](docs/07-任务质量清单.md) 审一遍。
+4. 用 `suite_report.md` 的“小团队操作摘要”先看未稳定通过任务、故障任务、flaky 任务和失败规则热点。
+
+详细路径见 [docs/06-小团队落地指南.md](docs/06-小团队落地指南.md)。可复制模板见 [evalsets/_template](evalsets/_template)。
 
 ## 写一个任务
 
@@ -277,6 +308,7 @@ bin/agent-eval export --run runs/xxx/run_yyy
 | --- | --- | --- |
 | [`ael-build-evalset`](.agents/skills/ael-build-evalset/SKILL.md) | 从零建设私有测评集、接入真实 Agent、跑批量对比 | `evalsets/<set>/`、任务样例、`agents.yaml`、suite/history 命令 |
 | [`ael-new-task`](.agents/skills/ael-new-task/SKILL.md) | 新增或修改内置 `tasks/<task-id>/` 任务 | `task.yaml`、`work/`、`hidden/`、`samples/` 和 fail→pass 回放闭环 |
+| [`ael-review-task-quality`](.agents/skills/ael-review-task-quality/SKILL.md) | 审查任务能否进入 smoke/regression 门禁 | hidden 防泄露检查、样例闭环、判分稳定性和分层建议 |
 | [`ael-analyze-results`](.agents/skills/ael-analyze-results/SKILL.md) | 评测跑完后分析 run/suite/history，定位为什么掉分或没过 | 基于 `report.json`、`suite_report.json`、trace 和 feedback 的证据化诊断 |
 | [`ael-verify`](.agents/skills/ael-verify/SKILL.md) | 改完代码、任务、红队或文档后选择验证闸 | 最便宜但足够证明正确性的验证命令组合 |
 
@@ -284,12 +316,15 @@ bin/agent-eval export --run runs/xxx/run_yyy
 
 - 要评估自己的 Agent：从 `ael-build-evalset` 开始，不要把私有业务任务混进内置 `tasks/`。
 - 要给框架新增内置题：用 `ael-new-task`，并严格检查 hidden 防泄露。
+- 要把任务放进 smoke/regression：用 `ael-review-task-quality` 做质量审查。
 - 已经有评测结果但不知道问题在哪：用 `ael-analyze-results`。
 - 准备提交前：用 `ael-verify` 选验证闸，再按需要跑 `bash bin/ci-smoke.sh`。
 
 ## 文档地图
 
 - [docs/05-交互式导览.html](docs/05-交互式导览.html)：用户、产品、开发三视角的单文件交互导览。
+- [docs/06-小团队落地指南.md](docs/06-小团队落地指南.md)：从私有 evalset、Agent 接入、suite 门禁到报告解读的落地路径。
+- [docs/07-任务质量清单.md](docs/07-任务质量清单.md)：任务进入 smoke/regression 前的质量审查标准。
 - [AGENTS.md](AGENTS.md)：AI 协作入口、架构分区、验证阶梯和安全红线。
 - [docs/CODEMAP.md](docs/CODEMAP.md)：由源码生成的类级地图，CI 会检查漂移。
 - [docs/PLAYBOOK.md](docs/PLAYBOOK.md)：新增 check、CLI、Agent adapter、任务、trace 事件等常见改造 recipe。

@@ -73,10 +73,14 @@ class SuiteRunnerTest {
         assertThat(report.path("suite").path("passed").asLong()).isEqualTo(result.passedCount());
         assertThat(report.path("suite").path("all_passed").asBoolean()).isEqualTo(result.allPassed());
         assertThat(report.path("results")).hasSize(result.total());
+        assertThat(report.path("risk_summary").path("not_passed_tasks").isArray()).isTrue();
+        if (result.allPassed()) {
+            assertThat(report.path("risk_summary").path("failed_rules_by_id").isEmpty()).isTrue();
+        }
 
         // Markdown 汇总应包含任务集标题与逐任务明细表头。
         String md = Files.readString(outDir.resolve("suite_report.md"));
-        assertThat(md).contains("任务集评估汇总").contains("逐任务明细");
+        assertThat(md).contains("任务集评估汇总").contains("小团队操作摘要").contains("逐任务明细");
     }
 
     @Test
@@ -147,6 +151,32 @@ class SuiteRunnerTest {
         assertThat(result.totalRuns()).isEqualTo(2);
         assertThat(result.totalPasses()).isEqualTo(1);
         assertThat(result.passRate()).isEqualTo(0.5);
+    }
+
+    @Test
+    void 失败suite报告_聚合未通过任务与失败规则热点() throws Exception {
+        SuiteRunner.AgentSpec agent = SuiteRunner.AgentSpec.cli("bad-copy", failAgentCmd());
+
+        SuiteRunner.SuiteResult result = SuiteRunner.run(
+                Path.of("tasks"), runsRoot, null, Set.of("api-payload-001"), agent, 1);
+
+        assertThat(result.allPassed()).isFalse();
+        Path reportJson = SuiteRunner.writeReports(result, outDir);
+        JsonNode report = Jsons.json().readTree(Files.readString(reportJson));
+
+        assertThat(report.path("risk_summary").path("action_required").asBoolean()).isTrue();
+        assertThat(report.path("risk_summary").path("not_passed_tasks").get(0).asText())
+                .isEqualTo("api-payload-001");
+        assertThat(report.path("risk_summary").path("failed_rules_by_id").toString())
+                .contains("TOTAL_AMOUNT", "ORDER_TYPE");
+        assertThat(report.path("results").get(0).path("failed_rule_ids").toString())
+                .contains("TOTAL_AMOUNT", "ORDER_TYPE");
+
+        String md = Files.readString(outDir.resolve("suite_report.md"));
+        assertThat(md)
+                .contains("未稳定通过任务：`api-payload-001`")
+                .contains("失败规则热点")
+                .contains("`TOTAL_AMOUNT`");
     }
 
     @Test
@@ -228,6 +258,12 @@ class SuiteRunnerTest {
      */
     private static String goodAgentCmd() {
         Path sample = Path.of("tasks/api-payload-001/samples/attempt-pass.json").toAbsolutePath();
+        return "sed \"s/[{]attempt_id[}]/${AEL_ATTEMPT_ID}/\" '" + sample
+                + "' > \"${AEL_INBOX}/${AEL_ATTEMPT_ID}.json\"";
+    }
+
+    private static String failAgentCmd() {
+        Path sample = Path.of("tasks/api-payload-001/samples/attempt-fail.json").toAbsolutePath();
         return "sed \"s/[{]attempt_id[}]/${AEL_ATTEMPT_ID}/\" '" + sample
                 + "' > \"${AEL_INBOX}/${AEL_ATTEMPT_ID}.json\"";
     }

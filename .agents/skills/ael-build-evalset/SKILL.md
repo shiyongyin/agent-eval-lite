@@ -7,7 +7,7 @@ description: AI 辅助用户从零搭建自己的 AgentEval-Lite 测评集并接
 
 你（AI）在这个工作流里是「评估工程师」：先访谈把模糊诉求变成可判分的任务设计，再代用户生成任务、接入 Agent、实跑度量。权威规范：`tasks/AGENTS.md`（任务红线）、`docs/PLAYBOOK.md` recipe 4、根 `README.md`（check 类型语义）。**可运行的完整参照**：`evalsets/demo-ops-agent/`（2 个任务 + 2 个示例 cli Agent + agents.yaml 对比面板，README 里的命令逐条可跑）。
 
-**布局铁律**：用户私有测评集放独立根目录（推荐 `evalsets/<set-name>/`），不要放进内置 `tasks/`——那是框架自测库，会进 CI 门禁。所有命令显式带 `--tasks-root` 与 `--runs-root`。
+**布局铁律**：用户私有测评集放独立根目录（推荐 `evalsets/<set-name>/`），不要放进内置 `tasks/`——那是框架自测库，会进 CI 门禁。所有命令显式带 `--tasks-root` 与 `--runs-root`。新集合优先用 `bin/agent-eval evalset init --id <set-name>` 起步；没有构建产物时也可以复制 `evalsets/_template/`。
 
 ```text
 evalsets/<set-name>/
@@ -28,6 +28,7 @@ evalsets/<set-name>/
 ## 阶段 1：逐任务生成（每个任务都走完这五步再做下一个）
 
 ```bash
+bin/agent-eval evalset init --id <set-name>                         # 新集合先建骨架
 bin/agent-eval task init --id <task-id> --tasks-root evalsets/<set>/tasks   # 从能跑的脚手架开始
 ```
 
@@ -44,6 +45,8 @@ bin/agent-eval run --task evalsets/<set>/tasks/<task-id> --agent scripted \
 ```
 
 设计任务内容时逐条过 `tasks/AGENTS.md` 的 hidden 防泄露检查单。
+
+任务进入 smoke/regression 门禁前，再用 `ael-review-task-quality` 或 `docs/07-任务质量清单.md` 做质量审查；不要只因为 replay 能过就把任务放进硬门禁。
 
 ## 阶段 2：接入用户的真实 Agent
 
@@ -98,7 +101,7 @@ bin/agent-eval history --runs-root evalsets/<set>/runs
 
 `agents.yaml` 格式见 README「suite」一节。解读要点：
 
-- 多 Agent 横向对比看 suite 的对比面板（`suite_report.md`：pass^k 稳定通过数、平均耗时、自报成本）；
+- 多 Agent 横向对比看 suite 的对比面板（`suite_report.md`：小团队操作摘要、pass^k 稳定通过数、失败规则热点、平均耗时、自报成本）；
 - `history` 按 **(task_id, 适配器名)** 聚合——多个 cli Agent 会混进同一行 `cli`，它适合看单 Agent 的纵向趋势，横向选型请以 suite 对比报告为准；
 - 单任务掉分先看 `<run>/report/report.md` 的 failed checks 与 `<run>/feedback/`，再看 `<run>/agent-logs/`（Agent 到底输出了什么）。
 

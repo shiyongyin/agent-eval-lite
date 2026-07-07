@@ -17,7 +17,7 @@ import picocli.CommandLine.Command;
         name = "agent-eval",
         mixinStandardHelpOptions = true,
         version = "agent-eval-lite 0.1.0",
-        description = "轻量级通用 AI Agent 评估框架（AgentEval-Lite）",
+        description = "企业内部 AI Agent 测试脚手架（AgentEval-Lite）",
         subcommands = {
                 RunCommand.class,
                 SuiteCommand.class,
@@ -27,6 +27,7 @@ import picocli.CommandLine.Command;
                 ValidateCommand.class,
                 ListCommand.class,
                 HistoryCommand.class,
+                EvalsetCommand.class,
                 ToolCommand.class,
                 TaskCommand.class
         })
