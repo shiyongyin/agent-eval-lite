@@ -206,6 +206,13 @@ bin/agent-eval evalset init --id my-agent
 
 详细路径见 [docs/06-小团队落地指南.md](docs/06-小团队落地指南.md)。可复制模板见 [evalsets/_template](evalsets/_template)。
 
+有 AI 编码助手时，建议直接让 AI 使用项目级 skills：
+
+- “用 `ael-build-evalset` 基于 `evalset init` / `evalsets/_template` 帮我建私有测评集。”
+- “用 `ael-new-task` 在这个 evalset 里生成一个任务脚手架。”
+- “用 `ael-review-task-quality` 审查这个任务能不能进 smoke/regression。”
+- “用 `ael-verify` 跑提交前最小验证。”
+
 ## 写一个任务
 
 从脚手架开始：

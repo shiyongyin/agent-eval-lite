@@ -9,6 +9,8 @@ description: AI 辅助用户从零搭建自己的 AgentEval-Lite 测评集并接
 
 **布局铁律**：用户私有测评集放独立根目录（推荐 `evalsets/<set-name>/`），不要放进内置 `tasks/`——那是框架自测库，会进 CI 门禁。所有命令显式带 `--tasks-root` 与 `--runs-root`。新集合优先用 `bin/agent-eval evalset init --id <set-name>` 起步；没有构建产物时也可以复制 `evalsets/_template/`。
 
+**小团队默认策略**：用户还没有明确业务题库、只是想先补基础设置时，不要编造任务，也不要手写空目录。先用 `evalset init` / `evalsets/_template` 建骨架；等用户提供真实材料后，再用 `ael-new-task` 逐个生成任务，并用 `ael-review-task-quality` 决定能否进入 smoke/regression。
+
 ```text
 evalsets/<set-name>/
 ├── tasks/<task-id>/     # 任务集（结构同内置任务：task.yaml + work/ + hidden/ + samples/）

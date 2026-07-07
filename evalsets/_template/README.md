@@ -8,6 +8,17 @@ bin/agent-eval evalset init --id my-agent
 
 私有测评集用于承载团队自己的 Agent 测试资产，独立于仓库内置 `tasks/`。内置 `tasks/` 是框架自测库，会进 CI 门禁；业务题库应放在 `evalsets/<set>/tasks/`。
 
+## 给 AI 助手的说明
+
+如果有 AI 辅助，请优先让 AI 使用仓库内置 skills 和本模板：
+
+- `ael-build-evalset`：从本模板或 `evalset init` 起步，搭建私有测评集并接入 Agent。
+- `ael-new-task`：在 `tasks/` 下生成和修改任务脚手架。
+- `ael-review-task-quality`：任务进入 smoke/regression 前做质量审查。
+- `ael-verify`：改完后选择最小验证门禁。
+
+不要让 AI 从空目录手写任务结构；应先生成脚手架，再替换业务材料、hidden 规则和样例闭环。
+
 ## 目录约定
 
 | 路径 | 用途 |
