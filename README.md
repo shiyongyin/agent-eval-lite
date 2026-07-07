@@ -1,9 +1,11 @@
 # AgentEval-Lite
 
+> 企业内部 AI Agent 测试脚手架：把真实业务任务变成可提交、可判分、可回放、可进 CI 的评测集。
+
 [![CI](https://github.com/shiyongyin/agent-eval-lite/actions/workflows/ci.yml/badge.svg)](https://github.com/shiyongyin/agent-eval-lite/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-AgentEval-Lite 是一个本地优先的通用 AI Agent 评估框架。它回答的问题不是“这个 Agent 聊得像不像人”，而是“它有没有把任务做对，证据在哪，换个时间重评分数是否一致”。
+AgentEval-Lite 是一个面向企业内部 AI Agent 的本地优先测试脚手架。它回答的问题不是“这个 Agent 聊得像不像人”，而是“它有没有把任务做对，证据在哪，换个时间重评分数是否一致”。
 
 它把一次评估做成可版本化、可回放、可审计的目录契约：任务材料放在 `work/`，隐藏答案和 judge 规则放在 `hidden/`，Agent 只能写结构化提交，框架负责隐藏判分、受控反馈、签名留痕和报告生成。
 
@@ -19,10 +21,32 @@ GitHub 仓库里的 `.html` 文件点开会显示源码；上面的 GitHub Pages
 
 ## 适合什么
 
-- 评估命令行 Agent、HTTP Agent、自研 Agent、人工基线。
-- 做代码修复、API payload 生成、文档分析、工具调用纪律、PRD 评审等结构化验收任务。
+- 企业内部评估命令行 Agent、HTTP Agent、自研 Agent、人工基线。
+- 把代码修复、API payload 生成、文档分析、工具调用纪律、PRD 评审等业务场景做成结构化验收任务。
 - 把 Agent 能力评估纳入 CI、红队回归、版本对比和多 Agent 横评。
 - 为私有业务场景搭建自己的 evalset，同时保留隐藏答案和评分规则。
+
+## 用户画像
+
+| 用户 | 常见问题 | AgentEval-Lite 提供什么 |
+| --- | --- | --- |
+| AI Agent 平台 / 中台团队 | 多个 Agent、模型、prompt、工具链怎么选型和回归 | 统一任务集、`agents.yaml` 横评、`repeat` 稳定性、CI 门禁 |
+| 业务自动化团队 | 业务 Agent 上线前怎么证明真的会干活 | 把真实业务流程改写成带隐藏标准答案的任务，并输出可复核报告 |
+| QA / 工程效能团队 | Agent 能力回归无法自动化，报告不可复现 | suite 批跑、确定性回放、历史趋势和离线复算 |
+| 安全 / 治理团队 | 被评 Agent 可能偷看答案、伪造工具调用、刷分 | Work/Judge 隔离、HMAC trace、canary、防逃逸红队门禁 |
+| Agent 开发者 | 改完 Agent 不知道弱点在哪 | 多轮受控反馈、维度化分数、trace 和失败证据 |
+
+## 功能边界
+
+它不是榜单型 benchmark，也不是 Prompt 单轮评分器。更准确地说，它是企业内部把私有业务场景沉淀成 Agent 测试资产的脚手架。
+
+| 同类方向 | 更擅长 | AgentEval-Lite 更擅长 |
+| --- | --- | --- |
+| promptfoo / DeepEval | prompt、LLM 输出、断言和模型辅助评分 | 多轮 Agent 任务、隐藏判分、结构化提交、工具调用可信核验 |
+| Ragas | RAG 问答质量、faithfulness、检索引用指标 | 非 RAG 专项的通用业务任务验收，例如代码、API、文档、工具链 |
+| Inspect AI | 更完整的生产级 eval 框架、模型和沙箱生态 | 单 jar、本地目录契约、企业内部私有 evalset 的低门槛落地 |
+| SWE-bench / tau-bench | 公共基准任务和研究评测 | 把公司自己的流程、接口、文档、工具权限变成私有测试集 |
+| Phoenix / Langfuse | trace 看板、观测和分析平台 | 评测执行、隐藏评分、签名留痕；也可导出 OTLP/OpenInference 给看板消费 |
 
 ## 核心机制
 

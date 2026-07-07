@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AgentEval-Lite 交互式导览 — 用户 · 产品 · 开发三视角</title>
-<meta name="description" content="AgentEval-Lite 轻量级通用 AI Agent 评估框架的交互式导览：如何接入各类 Agent、如何构建高质量测评集、产品定位与机制、架构设计与二次开发。">
+<title>AgentEval-Lite 交互式导览 — 企业内部 AI Agent 测试脚手架</title>
+<meta name="description" content="AgentEval-Lite 企业内部 AI Agent 测试脚手架的交互式导览：如何接入各类 Agent、如何构建私有测评集、产品定位与机制、架构设计与二次开发。">
 <style>
 /* ============ 设计令牌 ============ */
 :root{
@@ -462,8 +462,8 @@ details.acc .accbody p,details.acc .accbody li{font-size:13.8px;color:#cbd5e1}
     <div class="hero">
       <span class="eyebrow"><span class="dotpulse"></span>Java 17 · 单 jar · 零外部服务依赖 · 本页离线可用</span>
       <h1><span class="grad">AgentEval-Lite</span></h1>
-      <p class="lead">轻量级、通用的 AI Agent 评估框架：给任意 Agent 出一道<b>有隐藏标准答案</b>的题，全程留痕、多轮受控反馈，产出<b>可复现</b>的评分报告。</p>
-      <p class="sub">参考 EdgeBench / SForge 的核心思想（Work/Judge 隔离、结构化提交、隐藏判分、过程留痕），做成「目录即隔离」的本地落地版。代码修复、API payload 生成、文档分析、工具调用纪律、需求评审——任何可结构化验收的任务都装进同一套模型。</p>
+      <p class="lead">企业内部 AI Agent 测试脚手架：把真实业务任务变成<b>有隐藏标准答案</b>的评测集，全程留痕、多轮受控反馈，产出<b>可复现</b>的评分报告。</p>
+      <p class="sub">参考 EdgeBench / SForge 的核心思想（Work/Judge 隔离、结构化提交、隐藏判分、过程留痕），做成「目录即隔离」的本地落地版。代码修复、API payload 生成、文档分析、工具调用纪律、需求评审——企业内部任何可结构化验收的 Agent 任务都装进同一套测试模型。</p>
 
       <div class="loopstrip">
         <div class="lnode"><div class="ln">STEP 1</div><div class="lt">出题</div><div class="ld">task.yaml + 可见材料 work/ + 隐藏评审 hidden/</div></div>
@@ -1225,7 +1225,7 @@ bin/agent-eval history --runs-root runs</code></pre></div>
 <!-- ========== P1 定位 ========== -->
 <div class="spanel" data-title="定位：是什么、有什么用" data-desc="痛点与解法 · 价值对照 · 业界关系">
   <h2>第 1 步 · 定位：它是什么、有什么用、解决什么问题</h2>
-  <p class="pdesc"><b>一句话定位：</b>AgentEval-Lite 是一个本地优先的通用 AI Agent 评估框架——回答的不是「这个 Agent 聊得像不像人」，而是「<b>它到底有没有把任务做对</b>，证据在哪，换个时间重评分数还一样吗」。</p>
+  <p class="pdesc"><b>一句话定位：</b>AgentEval-Lite 是一个面向企业内部 AI Agent 的本地优先测试脚手架——回答的不是「这个 Agent 聊得像不像人」，而是「<b>它到底有没有把任务做对</b>，证据在哪，换个时间重评分数还一样吗」。</p>
 
   <h3 class="sec">有什么用：六个「你想要什么 → 它怎么解决 → 你得到什么」</h3>
   <div class="tblwrap"><table class="tbl">
