@@ -21,6 +21,10 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+/**
+ * {@link ReportGenerator} 的报告重建行为测试：从 run 工件纯读重建 report.json/report.md，
+ * 工具统计只计入签名可核验的 tool_call 事件（与判分同口径，防伪造统计混入报告）。
+ */
 class ReportGeneratorTest {
 
     @TempDir

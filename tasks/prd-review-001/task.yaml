@@ -2,6 +2,8 @@ schema_version: 1
 task_id: prd-review-001
 task_name: 评审会员积分兑换功能 PRD
 task_type: review
+tier: domain
+labels: [review]
 description: >
   评估 Agent 的需求评审能力：识别 PRD 中的规则缺口（过期、并发、失败补偿、风控）、
   指出缺失的验收标准并给出可执行的补全建议。评审规则按「风险点覆盖度」给部分得分，

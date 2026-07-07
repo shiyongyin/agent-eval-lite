@@ -2,6 +2,8 @@ package com.agenteval.cli;
 
 import com.agenteval.agent.AgentAdapter;
 import com.agenteval.agent.CliAgentAdapter;
+import com.agenteval.agent.DockerAgentAdapter;
+import com.agenteval.agent.DockerSandbox;
 import com.agenteval.agent.HttpAgentAdapter;
 import com.agenteval.agent.ManualAgentAdapter;
 import com.agenteval.agent.ScriptedAgentAdapter;
@@ -58,6 +60,26 @@ public final class RunCommand implements Callable<Integer> {
     @Option(names = "--cmd", description = "cli 模式：agent 命令模板（支持 {instructions} {workspace} {inbox} {attempt_id} {feedback} {run_dir} 占位符）")
     private String cmd;
 
+    @Option(names = "--sandbox", defaultValue = "none",
+            description = "cli 模式执行沙箱：none（宿主直跑，默认）| docker（容器强隔离，仅挂 workspace/inbox/feedback/instructions，根治偷看 hidden）")
+    private String sandbox;
+
+    @Option(names = "--sandbox-image",
+            description = "docker 沙箱镜像（--sandbox docker 时必填；须自带 Agent 命令所需环境）")
+    private String sandboxImage;
+
+    @Option(names = "--sandbox-network", defaultValue = "none",
+            description = "docker 沙箱网络模式（默认 none 断网；需联网的 Agent 用 bridge 并经 host-gateway 回连工具网关）")
+    private String sandboxNetwork;
+
+    @Option(names = "--sandbox-tool-jar",
+            description = "挂入容器供 `agent-eval tool call` 使用的 CLI jar（默认自动探测当前运行 jar；镜像需自带 JRE）")
+    private Path sandboxToolJar;
+
+    @Option(names = "--sandbox-docker-arg",
+            description = "透传给 docker run 的附加参数（如 --memory=512m，可重复）")
+    private List<String> sandboxDockerArgs;
+
     @Option(names = "--endpoint", description = "http 模式：Agent 服务端点 URL（框架按轮 POST 任务说明并收取提交）")
     private String endpoint;
 
@@ -80,6 +102,16 @@ public final class RunCommand implements Callable<Integer> {
     public Integer call() {
         if (resumeRunDir == null && taskDir == null) {
             System.err.println("错误: 需要 --task <任务目录> 或 --resume <run 目录>");
+            return 1;
+        }
+        try {
+            SandboxSupport.validateSandboxValue(sandbox);
+            if (SandboxSupport.isDocker(sandbox) && !"cli".equalsIgnoreCase(agent)) {
+                throw new IllegalArgumentException(
+                        "--sandbox docker 仅适用于 --agent cli（scripted 在框架进程内、http 为远端服务、manual 为人工，均无需容器隔离）");
+            }
+        } catch (IllegalArgumentException e) {
+            System.err.println("错误: " + e.getMessage());
             return 1;
         }
         AgentAdapter adapter;
@@ -121,6 +153,11 @@ public final class RunCommand implements Callable<Integer> {
             case "cli" -> {
                 if (cmd == null || cmd.isBlank()) {
                     throw new IllegalArgumentException("cli 模式需要 --cmd <命令模板>");
+                }
+                if (SandboxSupport.isDocker(sandbox)) {
+                    DockerSandbox docker = SandboxSupport.build(
+                            sandboxImage, sandboxNetwork, sandboxToolJar, sandboxDockerArgs);
+                    yield new DockerAgentAdapter(cmd, docker);
                 }
                 yield new CliAgentAdapter(cmd);
             }

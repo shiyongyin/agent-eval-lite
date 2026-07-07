@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "task_id": "config-audit-001",
+  "attempt_id": "{attempt_id}",
+  "submission_type": "generic",
+  "summary": "逐条对照 security-baseline.md 六条规则与 app.yaml：debug=true 违反 SEC-2、db_credential 明文违反 SEC-4、公网端口 tls=disabled 违反 SEC-5；其余三条合规。violations 按编号升序；SEC-4 在基线中级别为 critical，为最高",
+  "answer": { "violations": ["SEC-2", "SEC-4", "SEC-5"], "most_critical": "SEC-4" },
+  "known_risks": [],
+  "needs_human_review": false
+}

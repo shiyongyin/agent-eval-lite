@@ -1,0 +1,35 @@
+# config-audit-001 隐藏评审规则（Agent 不可见）。
+# feedback_fail 是回传 Agent 的对外文案，禁止包含期望值本身。
+schema_version: 1
+judge_version: "0.1.0"
+
+checks:
+  - id: VIOLATIONS_EXACT
+    type: jsonpath_equals
+    dimension: correctness
+    points: 50
+    severity: critical
+    path: "$.answer.violations"
+    expected_from: "expected/answer.json#/violations"
+    feedback_fail: answer.violations 与基线审计结论不一致（漏报、误报或未按编号升序）。请逐条对照 security-baseline.md 与 app.yaml 复核
+
+  - id: MOST_CRITICAL_CORRECT
+    type: jsonpath_equals
+    dimension: correctness
+    points: 20
+    severity: high
+    path: "$.answer.most_critical"
+    expected_from: "expected/answer.json#/most_critical"
+    feedback_fail: answer.most_critical 不正确。严重级别以基线文档声明的级别列为准，只在违规项里比较
+
+  - id: SOURCES_CITED
+    type: list_coverage
+    dimension: explanation
+    points: 30
+    severity: low
+    path: "$.summary"
+    min_matches: 2
+    expected_any_of:
+      - ["app.yaml"]
+      - ["security-baseline.md"]
+    feedback_fail: summary 未完整说明结论出处（应同时引用两份材料文件名）

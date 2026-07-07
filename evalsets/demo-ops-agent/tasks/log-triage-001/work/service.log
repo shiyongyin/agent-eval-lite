@@ -1,0 +1,13 @@
+2026-07-06T09:58:12Z INFO  [gateway] request accepted trace=a1f3
+2026-07-06T09:58:40Z INFO  [checkout] user u_2201 opened cart
+2026-07-06T09:59:03Z WARN  [payments] latency above threshold (1200ms)
+2026-07-06T09:59:21Z ERROR [payments] charge failed code=PAY-504 order=o_1001
+2026-07-06T09:59:22Z INFO  [payments] user reported error page shown, ticket T-88
+2026-07-06T10:00:02Z ERROR [db] connection pool exhausted code=DB-201
+2026-07-06T10:00:31Z ERROR [payments] charge failed code=PAY-504 order=o_1004
+2026-07-06T10:01:15Z WARN  [payments] retry scheduled for PAY-504 recovery
+2026-07-06T10:01:44Z ERROR [auth] token refresh rejected code=AUTH-101 user=u_2205
+2026-07-06T10:02:09Z ERROR [db] connection pool exhausted code=DB-201
+2026-07-06T10:02:37Z INFO  [gateway] circuit breaker half-open
+2026-07-06T10:03:05Z ERROR [payments] charge failed code=PAY-504 order=o_1009
+2026-07-06T10:03:30Z INFO  [payments] recovery completed

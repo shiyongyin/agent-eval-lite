@@ -17,8 +17,7 @@ import java.util.stream.Collectors;
  *
  * <p>计分模型：每个检查项向其维度贡献 (earned, possible)；
  * 维度得分 = 权重 × Σearned / Σpossible；总分 = Σ维度得分（1 位小数）。
- * 通过 = 总分 ≥ 通过线 <strong>且</strong> 无 blocking 检查失败（一票否决，
- * 与 agentScopeScaffold CompositeEvaluator 的 gate 语义同构）。
+ * 通过 = 总分 ≥ 通过线 <strong>且</strong> 无 blocking 检查失败（一票否决）。
  *
  * @author shiyongyin
  * @since 0.1.0

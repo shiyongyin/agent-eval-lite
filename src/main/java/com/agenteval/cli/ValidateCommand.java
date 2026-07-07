@@ -67,6 +67,8 @@ public final class ValidateCommand implements Callable<Integer> {
         }
         System.out.println("OK  " + spec.taskId()
                 + "（" + spec.taskType().jsonName()
+                + "，tier=" + spec.tier().jsonName()
+                + (spec.labels().isEmpty() ? "" : "，labels=" + String.join(",", spec.labels()))
                 + "，judge=" + spec.judge().type().jsonName()
                 + "，checks=" + checkCount
                 + "，维度=" + spec.scoring().dimensions().size()

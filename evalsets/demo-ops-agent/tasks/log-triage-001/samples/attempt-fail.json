@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "task_id": "log-triage-001",
+  "attempt_id": "{attempt_id}",
+  "submission_type": "generic",
+  "summary": "全文搜索 error 关键字得到 7 行，最高频错误码为 PAY-504（示例错误提交：未区分日志级别，也未注明出处）",
+  "answer": { "error_count": 7, "top_error_code": "PAY-504" },
+  "known_risks": [],
+  "needs_human_review": false
+}

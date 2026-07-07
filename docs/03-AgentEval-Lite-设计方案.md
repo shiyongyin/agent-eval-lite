@@ -6,13 +6,13 @@
 
 ## 0. 放置位置决策
 
-**独立项目 `/Users/mac/work/agent-eval-lite`（独立 git 仓库、独立 Maven 工程），不放入 agentScopeScaffold。**
+**独立项目 `agent-eval-lite`（独立 git 仓库、独立 Maven 工程），不嵌入具体业务 Agent 仓库。**
 
 理由（详见 `01-代码库理解报告.md` §5）：
-1. scaffold 的 ADR-0017 已明文决策「不自建 AgentOps 平台」；
-2. scaffold 的 `DeadCodeGuardTest` / NOT-WIRED 台账纪律会把「无运行时消费方」的评估框架直接判红；
-3. 评估框架的被测对象是任意 Agent（CLI / HTTP / 人工），生命周期与该 Spring 应用无关；
-4. 裁判与选手不同仓，是 Work/Judge 隔离思想在仓库粒度的自然延伸——scaffold 将来作为**被测 API Agent** 接入本框架（Phase 2）。
+1. 业务 Agent 与评估框架的生命周期、发布节奏和依赖边界不同；
+2. 评估框架对业务应用而言通常是「无运行时消费方」的旁路工具，不应挤进业务架构门禁；
+3. 评估框架的被测对象是任意 Agent（CLI / HTTP / 人工），不绑定某个应用；
+4. 裁判与选手不同仓，是 Work/Judge 隔离思想在仓库粒度的自然延伸——业务 Agent 可作为**被测 API Agent** 接入本框架。
 
 技术栈：**Java 17 + Maven**（与现有工具链一致）；核心依赖仅 4 个——picocli（CLI）、Jackson databind+yaml（序列化）、networknt json-schema-validator（schema 校验）、SLF4J simple（日志）；测试 JUnit 5 + AssertJ。**不引入 Spring、不引入数据库**，所有产物落文件系统。
 
@@ -648,7 +648,7 @@ public interface ToolHandler {
 | 敏感信息 | work/ 只放合成/脱敏数据（任务编写规范写入 README）；`validate` 命令做启动期检查（可配敏感词模式） |
 | 生产 API | 默认全 mock；real 工具需在 task.yaml 显式声明 + `--allow-real-tools` 双重确认 |
 
-> 诚实声明：对「拥有任意 shell 的对抗性 Agent」，目录隔离是**约定+审计**而非强隔离——这正是 Phase 4 的升级理由，也与 EdgeBench 论文附录 C 的结论一致（隔离必须做在环境层）。
+> 诚实声明：对「拥有任意 shell 的对抗性 Agent」，默认（非容器）模式的目录隔离是**约定+审计**而非强隔离——这正是 Phase 4 的升级理由，也与 EdgeBench 论文附录 C 的结论一致（隔离必须做在环境层）。**该升级的 Agent 侧隔离已落地为 `--sandbox docker`**（见下「已落地」段）。
 
 **阶段二（Phase 4）：Docker 隔离升级路径**
 
@@ -656,6 +656,8 @@ public interface ToolHandler {
 2. judge 容器：临时容器挂 hidden + 提交物只读副本，跑完即毁（ephemeral）。
 3. 提交经 host 侧本地 HTTP judge server 中介（把 §5 的 Judge 接口挂上 HTTP 即可，接口不变）。
 4. task.yaml 增补 `work.image` / `judge.image` 字段（向后兼容：无该字段则回落本地目录模式）。
+
+> **已落地（`--sandbox docker`）**：第 1 点的「work 容器」已实现——`DockerAgentAdapter` 把 cli Agent 命令包进 `docker run --rm`，容器**只**挂载 `workspace/`(rw)、`inbox/`(rw)、`feedback/`(ro)、`instructions.md`(ro)，`hidden/`/`judge/`/`traces/`/任务目录/宿主家目录一律不入容器，默认 `--network none` 断网（需工具时 `--sandbox-network bridge` 经 `host.docker.internal` 回连宿主常驻网关）。`run`/`suite`/`agents.yaml` 全线支持；镜像与附加 `docker run` 参数经 `--sandbox-image` / `--sandbox-docker-arg` 提供。红队 A（外科式偷看）+ A-sym（symlink 逃逸）+ A-find（全盘 find）在 Docker 就绪时全部 DEFENDED，登记基线归 0。**与本节原设计的差异**：判分仍在宿主进程内跑（第 2/3 点的独立 judge 容器 + HTTP 中介未采用），因为判分不接触 Agent、无需容器化即隔离；因此第 4 点的 `judge.image` 字段未引入，仅 Agent 侧按上述参数配置。
 
 ## 10. Auto-eval / Stop Hook / Resume（轻量实现）
 

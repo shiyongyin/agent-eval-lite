@@ -1,15 +1,13 @@
 package com.agenteval.agent;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * CLI Agent 适配器：驱动任何命令行形态的编码 Agent（claude、cursor-agent、自研 CLI 等）。
+ * CLI Agent 适配器：驱动任何命令行形态的编码 Agent（claude、cursor-agent、自研 CLI 等），进程直跑在宿主上。
  *
  * <p>命令模板支持占位符（自动做 shell 单引号安全包裹）：
  * {@code {instructions}} / {@code {workspace}} / {@code {inbox}} / {@code {attempt_id}} /
@@ -20,12 +18,13 @@ import org.slf4j.LoggerFactory;
  * <p>进程 cwd 固定为 workspace；stdout/stderr 合流落盘 {@code agent-logs/attempt_NNN.log}；
  * 超时即强杀（本轮按无提交处理，预算控制权在框架不在 Agent）。
  *
+ * <p>安全边界：本适配器与框架同机同用户，{@code hidden/} 等评审禁区在同一文件系统内，只靠目录约定与
+ * canary/指纹守卫（详见 README「安全边界」）。需要对不可信 Agent 做强隔离时改用 {@link DockerAgentAdapter}。
+ *
  * @author shiyongyin
  * @since 0.1.0
  */
 public final class CliAgentAdapter implements AgentAdapter {
-
-    private static final Logger log = LoggerFactory.getLogger(CliAgentAdapter.class);
 
     private final String commandTemplate;
 
@@ -55,46 +54,28 @@ public final class CliAgentAdapter implements AgentAdapter {
                 .replace("{feedback}", quote(feedback))
                 .replace("{run_dir}", quote(input.context().runDir().toAbsolutePath().toString()));
 
-        Path logFile = input.context().agentLogsDir().resolve(input.attemptId() + ".log");
-        ProcessBuilder builder = new ProcessBuilder("/bin/sh", "-c", cmd)
-                .directory(input.context().workspaceDir().toFile())
-                .redirectErrorStream(true)
-                .redirectOutput(logFile.toFile());
-        builder.environment().put("AEL_RUN_DIR", input.context().runDir().toAbsolutePath().toString());
-        builder.environment().put("AEL_INSTRUCTIONS", input.instructionsFile().toAbsolutePath().toString());
-        builder.environment().put("AEL_WORKSPACE", input.context().workspaceDir().toAbsolutePath().toString());
-        builder.environment().put("AEL_INBOX", input.context().inboxDir().toAbsolutePath().toString());
-        builder.environment().put("AEL_ATTEMPT_ID", input.attemptId());
-        builder.environment().put("AEL_FEEDBACK", feedback);
+        Map<String, String> env = new LinkedHashMap<>();
+        env.put("AEL_RUN_DIR", input.context().runDir().toAbsolutePath().toString());
+        env.put("AEL_INSTRUCTIONS", input.instructionsFile().toAbsolutePath().toString());
+        env.put("AEL_WORKSPACE", input.context().workspaceDir().toAbsolutePath().toString());
+        env.put("AEL_INBOX", input.context().inboxDir().toAbsolutePath().toString());
+        env.put("AEL_ATTEMPT_ID", input.attemptId());
+        env.put("AEL_FEEDBACK", feedback);
         if (input.toolAccess() != null) {
             // 让 `agent-eval tool call` 连回框架进程内的常驻网关（由服务端代写签名 trace）。
-            builder.environment().put("AEL_TOOL_ENDPOINT", input.toolAccess().endpoint());
-            builder.environment().put("AEL_TOOL_TOKEN", input.toolAccess().token());
+            env.put("AEL_TOOL_ENDPOINT", input.toolAccess().endpoint());
+            env.put("AEL_TOOL_TOKEN", input.toolAccess().token());
         }
 
-        int exitCode;
-        boolean timedOut = false;
-        try {
-            Process process = builder.start();
-            boolean finished = process.waitFor(input.timeout().toSeconds(), TimeUnit.SECONDS);
-            if (!finished) {
-                process.destroyForcibly();
-                timedOut = true;
-                exitCode = -1;
-                log.warn("agent 进程超时被终止（{}s）", input.timeout().toSeconds());
-            } else {
-                exitCode = process.exitValue();
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("启动 agent 进程失败: " + cmd, e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("等待 agent 进程被中断", e);
-        }
+        Path logFile = input.context().agentLogsDir().resolve(input.attemptId() + ".log");
+        AgentProcess.Result result = AgentProcess.run(
+                List.of("/bin/sh", "-c", cmd), env,
+                input.context().workspaceDir(), logFile, input.timeout(), null);
 
         Path expected = input.expectedSubmissionFile();
         Path submission = Files.isRegularFile(expected) ? expected : null;
-        return new AttemptOutcome(submission, !timedOut && exitCode == 0, exitCode, logFile, false);
+        return new AttemptOutcome(submission, !result.timedOut() && result.exitCode() == 0,
+                result.exitCode(), logFile, false);
     }
 
     private static String quote(String value) {

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "task_id": "llm-failclosed-001",
+  "attempt_id": "attempt_001",
+  "submission_type": "generic",
+  "summary": "红队夹具提交：结构合法，用于触发 llm_rubric 判分路径",
+  "known_risks": [],
+  "needs_human_review": false,
+  "answer": {
+    "value": 42,
+    "report": "本季度指标全部达成，风险与缓解措施如下……"
+  }
+}

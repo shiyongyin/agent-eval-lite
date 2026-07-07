@@ -2,6 +2,8 @@ schema_version: 1
 task_id: api-payload-001
 task_name: 按接口文档生成创建订单 payload
 task_type: api_payload
+tier: smoke
+labels: [api, structured-output]
 description: >
   评估 Agent 的接口文档理解与结构化产出能力：读接口文档与业务请求，正确套用 VIP 折扣规则，
   产出 schema 合法、金额准确、且给出证据链的 create-order payload。

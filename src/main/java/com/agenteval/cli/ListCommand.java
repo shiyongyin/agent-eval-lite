@@ -41,13 +41,15 @@ public final class ListCommand implements Callable<Integer> {
             System.out.println("任务库为空: " + tasksRoot);
             return 0;
         }
-        System.out.printf("%-24s %-12s %-8s %-10s %s%n", "TASK_ID", "TYPE", "JUDGE", "PASS", "NAME");
+        System.out.printf("%-24s %-12s %-12s %-8s %-10s %s%n",
+                "TASK_ID", "TYPE", "TIER", "JUDGE", "PASS", "NAME");
         for (Path dir : taskDirs) {
             try {
                 TaskSpec spec = TaskSpecLoader.load(dir);
-                System.out.printf("%-24s %-12s %-8s %-10s %s%n",
+                System.out.printf("%-24s %-12s %-12s %-8s %-10s %s%n",
                         spec.taskId(),
                         spec.taskType().jsonName(),
+                        spec.tier().jsonName(),
                         spec.judge().type().jsonName(),
                         spec.scoring().passScore() + "/" + spec.scoring().maxScore(),
                         spec.taskName());

@@ -30,6 +30,75 @@ class TaskSpecLoaderTest {
     }
 
     @Test
+    void 未声明分层时默认regression且标签为空() throws Exception {
+        Path taskDir = writeTask("no-tier", """
+                schema_version: 1
+                task_id: no-tier
+                task_name: 无分层任务
+                task_type: generic
+                agent_brief: 做点什么
+                judge:
+                  type: rules
+                  rules_file: hidden/judge.rules.yaml
+                scoring:
+                  max_score: 100
+                  pass_score: 80
+                  dimensions:
+                    - {name: a, weight: 100}
+                """);
+        TaskSpec spec = TaskSpecLoader.load(taskDir);
+        assertThat(spec.tier()).isEqualTo(TaskTier.REGRESSION);
+        assertThat(spec.labels()).isEmpty();
+    }
+
+    @Test
+    void 解析显式分层与标签() throws Exception {
+        Path taskDir = writeTask("tiered", """
+                schema_version: 1
+                task_id: tiered
+                task_name: 带分层任务
+                task_type: generic
+                tier: security
+                labels: [redteam, tool-discipline]
+                agent_brief: 做点什么
+                judge:
+                  type: rules
+                  rules_file: hidden/judge.rules.yaml
+                scoring:
+                  max_score: 100
+                  pass_score: 80
+                  dimensions:
+                    - {name: a, weight: 100}
+                """);
+        TaskSpec spec = TaskSpecLoader.load(taskDir);
+        assertThat(spec.tier()).isEqualTo(TaskTier.SECURITY);
+        assertThat(spec.labels()).containsExactly("redteam", "tool-discipline");
+    }
+
+    @Test
+    void 非法分层取值被拒绝() throws Exception {
+        Path taskDir = writeTask("bad-tier", """
+                schema_version: 1
+                task_id: bad-tier
+                task_name: 分层非法
+                task_type: generic
+                tier: turbo
+                agent_brief: 做点什么
+                judge:
+                  type: rules
+                  rules_file: hidden/judge.rules.yaml
+                scoring:
+                  max_score: 100
+                  pass_score: 80
+                  dimensions:
+                    - {name: a, weight: 100}
+                """);
+        assertThatThrownBy(() -> TaskSpecLoader.load(taskDir))
+                .isInstanceOf(TaskSpecException.class)
+                .hasMessageContaining("tier 取值非法");
+    }
+
+    @Test
     void 权重和不等于满分时聚合报错() throws Exception {
         Path taskDir = writeTask("bad-weights", """
                 schema_version: 1

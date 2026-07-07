@@ -1,0 +1,14 @@
+# demo-ops-agent 测评集的多 Agent 对比清单（suite --agents-file 用）。
+#
+# 注意：cli 命令的 cwd 是每个 run 的 workspace，引用本集合内的脚本不能写仓库相对路径。
+# 这里用 $AEL_RUN_DIR 锚定（runs 布局固定为 <set>/runs/<task>/<run>，向上三级即集合根），
+# 前提是批跑时 --runs-root 指向本集合的 runs/（见 README.md 的标准命令）。
+agents:
+  - label: baseline-scripted
+    type: scripted                 # 各任务 samples/replay.yaml 回放，作为「任务本身没坏」的基线
+  - label: smart-ops
+    type: cli
+    cmd: 'bash "$AEL_RUN_DIR/../../../agents/smart_ops_agent.sh"'
+  - label: naive-ops
+    type: cli
+    cmd: 'bash "$AEL_RUN_DIR/../../../agents/naive_ops_agent.sh"'

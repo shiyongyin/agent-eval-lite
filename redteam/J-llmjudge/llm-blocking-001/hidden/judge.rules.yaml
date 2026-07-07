@@ -1,0 +1,21 @@
+schema_version: 1
+judge_version: "0.1.0"
+# 红队夹具：llm_rubric 权重仅 10%（合规），但标记 blocking:true —— 非确定性信号一票否决，
+# validate 深度 lint 必须拒绝。
+checks:
+  - id: DET_CORRECT
+    type: jsonpath_exists
+    dimension: correctness
+    points: 90
+    path: "$.answer"
+    feedback_fail: 占位
+
+  - id: LLM_BLOCKING
+    type: llm_rubric
+    dimension: expression
+    points: 10
+    blocking: true
+    rubric_file: rubric.md
+    target: "$.answer.report"
+    min_score: 0.6
+    feedback_fail: 占位

@@ -100,6 +100,9 @@ public final class TaskCommand {
                     task_id: __TASK_ID__
                     task_name: TODO 一句话任务名（示例：从部署备忘中提取服务端口）
                     task_type: generic
+                    # 分层（可选，供 suite --tier 过滤；不影响判分）：smoke / regression / security / domain
+                    tier: regression
+                    labels: []
                     description: >
                       TODO（评估者视角，不渲染给 Agent）：这个任务评什么能力、为什么值得评。
                       模板演示「读材料 → 提取事实 → 结构化提交 + 注明出处」的最小闭环。

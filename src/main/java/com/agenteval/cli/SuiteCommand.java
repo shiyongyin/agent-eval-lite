@@ -1,7 +1,11 @@
 package com.agenteval.cli;
 
+import com.agenteval.agent.DockerSandbox;
 import com.agenteval.runner.SuiteRunner;
 import com.agenteval.runner.SuiteRunner.AgentSpec;
+import com.agenteval.task.TaskSpec;
+import com.agenteval.task.TaskSpecLoader;
+import com.agenteval.task.TaskTier;
 import com.agenteval.util.Ids;
 import com.agenteval.util.Jsons;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -81,6 +85,11 @@ public final class SuiteCommand implements Callable<Integer> {
             description = "仅批跑这些任务 id（逗号分隔）；缺省批跑全部任务")
     private String[] onlyTasks;
 
+    @Option(names = "--tier", split = ",",
+            description = "仅批跑这些分层的任务（逗号分隔：smoke / regression / security / domain）；"
+                    + "与 --tasks 取交集")
+    private String[] tiers;
+
     @Option(names = "--agent", defaultValue = "scripted",
             description = "Agent 类型：scripted（回放，默认）、cli（命令行 Agent）或 http（服务型 Agent）")
     private String agentType;
@@ -92,6 +101,26 @@ public final class SuiteCommand implements Callable<Integer> {
     @Option(names = "--endpoint",
             description = "http Agent 的服务端点 URL（--agent http 时必填）")
     private String endpoint;
+
+    @Option(names = "--sandbox", defaultValue = "none",
+            description = "cli Agent 执行沙箱：none（宿主直跑，默认）| docker（容器强隔离；单 Agent 与 agents.yaml 的 cli 项统一生效）")
+    private String sandbox;
+
+    @Option(names = "--sandbox-image",
+            description = "docker 沙箱镜像（--sandbox docker 时必填）")
+    private String sandboxImage;
+
+    @Option(names = "--sandbox-network", defaultValue = "none",
+            description = "docker 沙箱网络模式（默认 none 断网；需联网的 Agent 用 bridge）")
+    private String sandboxNetwork;
+
+    @Option(names = "--sandbox-tool-jar",
+            description = "挂入容器供 `agent-eval tool call` 使用的 CLI jar（默认自动探测当前运行 jar）")
+    private Path sandboxToolJar;
+
+    @Option(names = "--sandbox-docker-arg",
+            description = "透传给 docker run 的附加参数（如 --memory=512m，可重复）")
+    private List<String> sandboxDockerArgs;
 
     @Option(names = "--http-header",
             description = "http Agent 的附加请求头（形如 'Authorization: Bearer xxx'，可重复）")
@@ -126,20 +155,95 @@ public final class SuiteCommand implements Callable<Integer> {
             System.err.println("错误: --repeat 必须 ≥ 1");
             return 2;
         }
+        if (tiers != null && tiers.length > 0) {
+            try {
+                filter = resolveTierFilter(filter);
+            } catch (IllegalArgumentException e) {
+                System.err.println("错误: " + e.getMessage());
+                return 2;
+            }
+            if (filter.isEmpty()) {
+                System.err.println("错误: 没有任务匹配分层过滤条件 --tier "
+                        + String.join(",", tiers)
+                        + (onlyTasks == null ? "" : "（且受 --tasks 限定）"));
+                return 1;
+            }
+        }
         Path outDir = out != null ? out
                 : runsRoot.resolve("suite").resolve(Ids.newRunId().replace("run_", "suite_"));
 
+        DockerSandbox sandboxConfig;
+        try {
+            SandboxSupport.validateSandboxValue(sandbox);
+            sandboxConfig = SandboxSupport.isDocker(sandbox)
+                    ? SandboxSupport.build(sandboxImage, sandboxNetwork, sandboxToolJar, sandboxDockerArgs)
+                    : null;
+        } catch (IllegalArgumentException e) {
+            System.err.println("错误: " + e.getMessage());
+            return 2;
+        }
+
         return agentsFile != null
-                ? runComparison(filter, outDir)
-                : runSingle(filter, outDir);
+                ? runComparison(filter, outDir, sandboxConfig)
+                : runSingle(filter, outDir, sandboxConfig);
+    }
+
+    /**
+     * 把 {@code --tier} 解析为任务 id 集合，并与既有 {@code --tasks} 过滤取交集。
+     *
+     * <p>做法：扫描任务库、逐个加载 task.yaml，保留分层命中的任务 id。无法解析的任务目录
+     * 无法归类分层，此处静默跳过（其结构问题另由 {@code validate} / 批跑本身暴露）。
+     *
+     * @param taskIdFilter 既有的 {@code --tasks} 过滤集合（空表示不限定）
+     * @return 分层命中且落在 {@code --tasks} 限定内的任务 id 集合（保持任务库排序）
+     * @throws IllegalArgumentException {@code --tier} 取值非法时
+     */
+    private Set<String> resolveTierFilter(Set<String> taskIdFilter) {
+        Set<TaskTier> wanted = new LinkedHashSet<>();
+        for (String raw : tiers) {
+            String value = raw.trim();
+            if (value.isEmpty()) {
+                continue;
+            }
+            try {
+                wanted.add(TaskTier.valueOf(value.toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("未知的分层: " + value
+                        + "（可选 smoke / regression / security / domain）");
+            }
+        }
+        if (!Files.isDirectory(tasksRoot)) {
+            throw new IllegalArgumentException("任务库目录不存在: " + tasksRoot);
+        }
+        Set<String> matched = new LinkedHashSet<>();
+        try (java.util.stream.Stream<Path> stream = Files.list(tasksRoot)) {
+            stream.filter(Files::isDirectory)
+                    .filter(dir -> Files.isRegularFile(dir.resolve("task.yaml")))
+                    .sorted()
+                    .forEach(dir -> {
+                        TaskSpec spec;
+                        try {
+                            spec = TaskSpecLoader.load(dir);
+                        } catch (RuntimeException e) {
+                            return;
+                        }
+                        if (wanted.contains(spec.tier())
+                                && (taskIdFilter.isEmpty() || taskIdFilter.contains(spec.taskId()))) {
+                            matched.add(spec.taskId());
+                        }
+                    });
+        } catch (IOException e) {
+            throw new IllegalArgumentException("扫描任务库失败: " + tasksRoot + "（" + e.getMessage() + "）");
+        }
+        return matched;
     }
 
     // ---------------------------------------------------------------- 单 Agent 模式
 
-    private Integer runSingle(Set<String> filter, Path outDir) {
+    private Integer runSingle(Set<String> filter, Path outDir, DockerSandbox sandboxConfig) {
         AgentSpec agent;
         try {
-            agent = buildAgent();
+            agent = buildAgent(sandboxConfig);
         } catch (IllegalArgumentException e) {
             System.err.println("错误: " + e.getMessage());
             return 2;
@@ -167,12 +271,15 @@ public final class SuiteCommand implements Callable<Integer> {
         return 0;
     }
 
-    private AgentSpec buildAgent() {
+    private AgentSpec buildAgent(DockerSandbox sandboxConfig) {
         // 与 run --agent 的解析口径一致：大小写不敏感（RunCommand 用 toLowerCase 归一）。
         return switch (agentType.toLowerCase(Locale.ROOT)) {
             case "scripted" -> {
                 if (cmd != null) {
                     throw new IllegalArgumentException("--cmd 仅在 --agent cli 时有效");
+                }
+                if (sandboxConfig != null) {
+                    throw new IllegalArgumentException("--sandbox docker 仅适用于 --agent cli");
                 }
                 yield label == null ? AgentSpec.scripted()
                         : new AgentSpec(label, true, AgentSpec.scripted().factory());
@@ -181,11 +288,16 @@ public final class SuiteCommand implements Callable<Integer> {
                 if (cmd == null || cmd.isBlank()) {
                     throw new IllegalArgumentException("--agent cli 需要 --cmd 提供命令模板");
                 }
-                yield AgentSpec.cli(label, cmd);
+                yield sandboxConfig != null
+                        ? AgentSpec.dockerCli(label, cmd, sandboxConfig)
+                        : AgentSpec.cli(label, cmd);
             }
             case "http" -> {
                 if (endpoint == null || endpoint.isBlank()) {
                     throw new IllegalArgumentException("--agent http 需要 --endpoint 提供服务 URL");
+                }
+                if (sandboxConfig != null) {
+                    throw new IllegalArgumentException("--sandbox docker 仅适用于 --agent cli");
                 }
                 yield AgentSpec.http(label, endpoint, httpHeaders);
             }
@@ -196,10 +308,10 @@ public final class SuiteCommand implements Callable<Integer> {
 
     // ---------------------------------------------------------------- 对比模式
 
-    private Integer runComparison(Set<String> filter, Path outDir) {
+    private Integer runComparison(Set<String> filter, Path outDir, DockerSandbox sandboxConfig) {
         List<AgentSpec> agents;
         try {
-            agents = parseAgentsFile(agentsFile);
+            agents = parseAgentsFile(agentsFile, sandboxConfig);
         } catch (IllegalArgumentException | IOException e) {
             System.err.println("错误: 解析 --agents-file 失败: " + e.getMessage());
             return 2;
@@ -226,7 +338,7 @@ public final class SuiteCommand implements Callable<Integer> {
     }
 
     /**
-     * 解析多 Agent 对比配置。
+     * 解析多 Agent 对比配置（宿主直跑口径，cli 项不套容器）。
      *
      * @param file agents.yaml 路径
      * @return Agent 规格列表
@@ -234,6 +346,19 @@ public final class SuiteCommand implements Callable<Integer> {
      * @throws IllegalArgumentException 配置不合法
      */
     static List<AgentSpec> parseAgentsFile(Path file) throws IOException {
+        return parseAgentsFile(file, null);
+    }
+
+    /**
+     * 解析多 Agent 对比配置。
+     *
+     * @param file agents.yaml 路径
+     * @param sandboxConfig docker 沙箱配置（非 {@code null} 时对所有 cli 项统一套容器；scripted/http 项不受影响）
+     * @return Agent 规格列表
+     * @throws IOException 文件读取失败
+     * @throws IllegalArgumentException 配置不合法
+     */
+    static List<AgentSpec> parseAgentsFile(Path file, DockerSandbox sandboxConfig) throws IOException {
         if (!Files.isRegularFile(file)) {
             throw new IllegalArgumentException("文件不存在: " + file);
         }
@@ -257,7 +382,10 @@ public final class SuiteCommand implements Callable<Integer> {
                     if (agentCmd.isBlank()) {
                         throw new IllegalArgumentException("第 " + index + " 个 agent（cli）缺少 cmd");
                     }
-                    yield AgentSpec.cli(agentLabel.isBlank() ? "cli-" + index : agentLabel, agentCmd);
+                    String cliLabel = agentLabel.isBlank() ? "cli-" + index : agentLabel;
+                    yield sandboxConfig != null
+                            ? AgentSpec.dockerCli(cliLabel, agentCmd, sandboxConfig)
+                            : AgentSpec.cli(cliLabel, agentCmd);
                 }
                 case "http" -> {
                     String agentEndpoint = node.path("endpoint").asText("");

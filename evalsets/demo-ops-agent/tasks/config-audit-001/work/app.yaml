@@ -1,0 +1,22 @@
+# checkout-svc 生产部署配置
+service: checkout-svc
+profile: production
+
+runtime:
+  run_as_user: 1001          # 非 root 运行
+  debug: true                # 上线排障后忘了关
+  memory_limit: 512Mi
+
+network:
+  port: 8443
+  expose: public
+  tls: disabled              # 压测时临时关闭
+
+database:
+  host: db.internal
+  user: checkout
+  db_credential: "demo-inline-credential"   # 演示用不安全明文配置，真实环境应改为密钥引用
+
+logging:
+  level: info
+  mask_card_number: true

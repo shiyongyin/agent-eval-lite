@@ -2,6 +2,8 @@ schema_version: 1
 task_id: doc-analysis-001
 task_name: 从版本发布说明中提取破坏性变更
 task_type: document
+tier: regression
+labels: [document, extraction]
 description: >
   评估 Agent 的多文档信息提取与归纳能力：在三份夹杂大量普通特性说明的 release notes 中，
   找全破坏性变更（breaking changes）、正确标注出处版本、并以结构化 Markdown 交付。

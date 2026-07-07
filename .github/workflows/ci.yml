@@ -5,8 +5,13 @@ on:
     branches: ["**"]
   pull_request:
 
-# 说明：本流水线是「框架自证」的门禁——单元测试 + 任务集回放冒烟 + 红队回归三道闸，
-# 任一道被破坏都会挡下合并。全部步骤都是确定性的（回放/mock，不依赖模型或网络）。
+# 说明：本流水线是「框架自证」的门禁，两个 job：
+#  1) build-and-eval：CODEMAP 漂移 + 单元测试 + 任务集回放冒烟 + 红队回归四道闸（红队自适应——
+#     Docker 就绪走容器路径、不就绪回退非容器 A，开发友好）；
+#  2) redteam-docker-enforced：强制 Docker 红队门禁——不允许回退（RT_REQUIRE_DOCKER=1）、
+#     要求容器路径零 VULNERABLE（RT_ALLOWED_VULN=0）、沙箱镜像按 digest 固定，
+#     专门守护「不可信/强对抗 Agent 隔离能力」不被静默降级。
+# 步骤均确定性（回放/mock，不依赖模型）；容器 --network none 全程断网，仅一次性拉取沙箱镜像需网络。
 jobs:
   build-and-eval:
     runs-on: ubuntu-latest
@@ -20,6 +25,11 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
+
+      # CODEMAP 漂移门禁：docs/CODEMAP.md 由 bin/gen-codemap.sh 从源码生成（Javadoc 首句 /
+      # @Command 注解 / 枚举清单 / task.yaml）。与源码不一致说明忘了重新生成——地图说谎比没有地图更糟。
+      - name: Codemap drift gate
+        run: bash bin/gen-codemap.sh --check
 
       # 干净构建 + 单元/集成测试 + Checkstyle + JaCoCo 覆盖率下限，
       # 并产出 bin/agent-eval 依赖的 shaded CLI jar（verify 包含 package 阶段）。
@@ -55,4 +65,47 @@ jobs:
             runs/**/report/report.md
             runs/suite/**/suite_report.md
             runs/redteam/redteam_report.json
+          if-no-files-found: ignore
+
+  # 强制 Docker 红队门禁：与上面 build-and-eval 的「自适应回退」不同，本 job 不允许降级——
+  # Docker 不就绪即失败（RT_REQUIRE_DOCKER=1），且要求容器路径下零 VULNERABLE（RT_ALLOWED_VULN=0）。
+  # 沙箱镜像按 digest 固定，杜绝 latest 漂移导致的不可复现。这堵住「Docker job 静默走非容器路径、
+  # 隔离其实没被演练」的 fail-open 盲区——是面向不可信/强对抗 Agent 的隔离能力的硬回归网。
+  redteam-docker-enforced:
+    runs-on: ubuntu-latest
+    env:
+      # alpine:3.20（linux/amd64），digest 固定；升级镜像时同步更新此处并在 PR 说明。
+      RT_SANDBOX_IMAGE: alpine@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+      RT_REQUIRE_DOCKER: "1"
+      RT_ALLOWED_VULN: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      # 只构建 CLI jar（本 job 聚焦容器隔离回归，测试/质量门已在 build-and-eval 覆盖）。
+      - name: Build CLI jar
+        run: mvn -q -B -DskipTests clean package
+
+      # 预拉固定 digest 的沙箱镜像，随后强制模式跑红队：Docker 不就绪或有 VULNERABLE 即失败。
+      - name: Pull pinned sandbox image
+        run: docker pull "$RT_SANDBOX_IMAGE"
+
+      - name: Enforced Docker red-team gate
+        run: |
+          bash redteam/test_gate.sh
+          bash redteam/run_all.sh
+
+      - name: Upload red-team report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redteam-docker-report
+          path: runs/redteam/redteam_report.json
           if-no-files-found: ignore

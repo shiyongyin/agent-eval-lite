@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "task_id": "log-triage-001",
+  "attempt_id": "{attempt_id}",
+  "submission_type": "generic",
+  "summary": "依据 service.log：按级别列统计，ERROR 行共 6 条（消息含 error 字样的 INFO 行与提及错误码的 WARN 行均不计入）；其中 PAY-504 出现 3 次为最高频错误码",
+  "answer": { "error_count": 6, "top_error_code": "PAY-504" },
+  "known_risks": [],
+  "needs_human_review": false
+}

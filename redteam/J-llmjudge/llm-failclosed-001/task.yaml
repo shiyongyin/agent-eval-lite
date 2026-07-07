@@ -1,0 +1,39 @@
+schema_version: 1
+task_id: llm-failclosed-001
+task_name: 红队夹具·llm_rubric 未配置判分模型（应 fail-closed）
+task_type: generic
+tier: security
+labels: [redteam, llm-guardrail]
+description: >
+  红队夹具：一个 lint 合规（llm_rubric 权重 10%、非 blocking）的任务。
+  当判分模型未配置（AEL_LLM_ENDPOINT 缺失）时，judge 必须按评审设施故障上抛（fail-closed），
+  绝不静默给分或给零分。
+agent_brief: 占位（本任务仅供红队 judge fail-closed 断言）
+visible_context: []
+allowed_tools: []
+submit:
+  format: json
+  schema: builtin:generic
+  max_attempts: 1
+  cooldown_seconds: 0
+judge:
+  type: rules
+  rules_file: hidden/judge.rules.yaml
+  feedback:
+    level: failed_rules
+    include_scores: true
+scoring:
+  max_score: 100
+  pass_score: 80
+  selection: best_score
+  dimensions:
+    - name: correctness
+      weight: 90
+    - name: expression
+      weight: 10
+runtime:
+  timeout_minutes: 5
+  attempt_timeout_minutes: 5
+  allow_multi_submit: true
+  auto_eval_interval_seconds: 0
+  resume_enabled: true

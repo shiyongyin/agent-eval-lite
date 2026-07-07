@@ -1,12 +1,12 @@
 # AgentEval-Lite 红队审计报告
 
-> **时点声明**：本报告是红队套件初建期（矩阵 10 项，对应提交 `2092e70`）的审计快照，正文保留当时结论、不做改写。其后框架已扩充 G / H / D2 / I 四类攻击用例并完成门禁 fail-closed 化，当前矩阵为 **14 项：13 DEFENDED / 1 VULNERABLE（登记基线）**。最新复核结果与逐项时效性修正见文末第 11 节「复审更新」。
+> **时点声明**：本报告是红队套件初建期（矩阵 10 项，对应提交 `2092e70`）的审计快照，正文保留当时结论、不做改写。其后框架已扩充 G / H / D2 / I 四类攻击用例、J 组 llm_rubric 框架护栏（权重封顶 / 禁 blocking / fail-closed）、完成门禁 fail-closed 化，并落地 Docker Runner（`--sandbox docker`）。当前矩阵随 Docker 就绪度自适应：**Docker 就绪时 19 项全 DEFENDED（登记基线 0）；Docker 不就绪回退非容器 A 时为 17 项——16 DEFENDED / 1 VULNERABLE（登记基线 1）**。最新复核结果与逐项时效性修正见文末第 11 节「复审更新」。
 
 ## 1. 执行摘要
 
 当前框架处于“可内部试用”阶段：核心 TaskSpec、Runner、Submission、Judge、Trace、Tool Gateway、Report、多轮反馈和 Resume 都已可运行，且大部分攻击用例已有防护。
 
-结论：可以作为 Demo 和 MVP；可以给可信或半可信 Agent 做内部评估；不应直接接入真实业务流程或不可信 Agent。最大风险是 CLI Agent 与框架同机同用户运行，可直接读取 `tasks/<task-id>/hidden/`。最优先修复是引入容器/沙箱隔离，只挂载 workspace、inbox、feedback 和必要工具网关。
+结论：可以作为 Demo 和 MVP；可以给可信或半可信 Agent 做内部评估；不应直接接入真实业务流程或不可信 Agent。最大风险是 CLI Agent 与框架同机同用户运行，可直接读取 `tasks/<task-id>/hidden/`。最优先修复是引入容器/沙箱隔离，只挂载 workspace、inbox、feedback 和必要工具网关。（**时效更新**：该 P0 已在 §11.5 由 `--sandbox docker` 根因修复——容器只挂 Agent 可触碰区，红队 A 外科式偷看 + symlink/find 逃逸在 Docker 就绪时全部 DEFENDED；本节结论保留为快照期历史。）
 
 本次审计发现 3 个可低风险修复的问题并已修复：report 误统计伪造 tool trace、submission 接受伪造顶层字段、trace 被删除后仍可能通过。最终红队矩阵：9 DEFENDED，1 VULNERABLE。
 
@@ -26,7 +26,7 @@
 
 ## 3. 代码库理解结果
 
-框架位置：当前仓库根目录 `/Users/mac/work/agent-eval-lite`。
+框架位置：当前仓库根目录。
 
 主要模块：
 
@@ -163,7 +163,7 @@
 4. 能接真实业务流程：不建议，缺少强隔离和真实工具权限治理。
 5. 距离成熟框架还差：容器级隔离、OS 级文件/网络权限控制、CI 红队门禁、多 Agent 对比、真实工具治理和更强 trace 防篡改。
 
-## 11. 复审更新（2026-07-07，红队 14 项时期）
+## 11. 复审更新（2026-07-07，含 Docker Runner 落地）
 
 本节记录快照之后的演进与复核结果，并逐项修正正文中已过时的结论；正文其余部分保留为历史证据。
 
@@ -171,11 +171,12 @@
 
 | 命令 | 结果 |
 |---|---|
-| `mvn -q -B clean verify` | 通过：127 个测试全绿，JaCoCo 指令覆盖率 0.7852（≥ 0.75 门禁），Checkstyle 无违规 |
+| `mvn -q -B clean verify` | 通过：159 个测试全绿（含 docker 沙箱端到端用例，无 Docker 环境自动跳过），JaCoCo 指令覆盖率 ≥ 0.75 门禁，Checkstyle 无违规 |
 | `bin/agent-eval suite --tasks-root tasks --fail-on-not-passed` | 通过：5/5 任务稳定通过 |
-| `bash redteam/run_all.sh` | 14 项：13 DEFENDED / 1 VULNERABLE（登记基线：红队 A 外科式偷看）/ INFRA=0 / CHECK=0 |
+| `bash redteam/run_all.sh`（Docker 就绪） | 19 项全 DEFENDED / VULNERABLE=0（登记基线 0）/ INFRA=0 / CHECK=0 |
+| `bash redteam/run_all.sh`（无 Docker 回退） | 17 项：16 DEFENDED / 1 VULNERABLE（登记基线 1：红队 A 外科式偷看）/ INFRA=0 / CHECK=0 |
 | `bash redteam/test_gate.sh` | 门禁判定 fail-closed 契约自测 7/7 通过 |
-| `RT_ALLOWED_VULN=0 bash redteam/run_all.sh` | 负向验证：退出码 1，门禁按预期拦截基线外 VULNERABLE |
+| `RT_ALLOWED_VULN=0 bash redteam/run_all.sh` | 负向验证：无 Docker 时退出码 1，门禁按预期拦截基线外 VULNERABLE |
 | `bash bin/ci-smoke.sh` | 四道门禁全部通过 |
 
 ### 11.2 快照后新增的防护（均已 DEFENDED）
@@ -185,12 +186,13 @@
 - **D2 PASS_TO_PASS 回归**（借鉴 SWE-bench）：修好目标缺陷却改坏既有 `maxPrice` 行为，被隐藏行为规格一票否决。
 - **I 过程对终态错**（借鉴 tau-bench）：`world_state` check 把签名可信且成功的写工具调用折叠为世界终态与期望比对，「流程对、提交对、终态错」被一票否决。
 - **门禁 fail-closed 化**：`VULNERABLE` 超出登记基线 `RT_ALLOWED_VULN`（默认 1）、或出现 INFRA / CHECK 即失败；每次运行产出结构化工件 `runs/redteam/redteam_report.json`；判定逻辑抽为 `redteam/gate_lib.sh` 纯函数并配 `redteam/test_gate.sh` 正/负向自测，已接入 `.github/workflows/ci.yml` 与 `bin/ci-smoke.sh`。
+- **J 组 llm_rubric 框架护栏**：非确定性 LLM 判分的滥用面在框架侧——J1 有效权重 >30% 上限被 `validate` 深度 lint 拒绝、J2 标记 `blocking` 被拒（非确定性信号不得一票否决）、J3 判分模型未配置时 `judge` fail-closed（非零退出且绝不产出分数）。三项均确定性、无需真实模型、全程断网；另有 `LlmRubricRedTeamTest` 用 mock 端点覆盖「注入降级为数据 / 越界分数钳制 / 违约 fail-closed」。
 
 ### 11.3 正文时效性修正
 
 | 正文位置 | 快照结论 | 当前状态 |
 |---|---|---|
-| §1 / §2 | 红队矩阵 9 DEFENDED / 1 VULNERABLE | 14 项：13 DEFENDED / 1 VULNERABLE（登记基线残留） |
+| §1 / §2 | 红队矩阵 9 DEFENDED / 1 VULNERABLE | Docker 就绪 19 项全 DEFENDED（基线 0）；无 Docker 回退 17 项 16 DEFENDED / 1 VULNERABLE（基线 1） |
 | §3 未实现清单 | 多 Agent 对比报告未实现 | 已实现：`suite --agents-file` 任务×Agent 矩阵 + pass^k 可靠性 + 排名面板 |
 | §5 CI/回归 扣分项 | 无 CI 配置文件 | `.github/workflows/ci.yml` 与 `bin/ci-smoke.sh` 已落地（测试/体检/套件/红队四步） |
 | §6 P2 | 没有多 Agent 横向对比报告 | 已完成（同上） |
@@ -198,6 +200,15 @@
 
 ### 11.4 维持不变的结论
 
-- **P0 未修**：外科式偷看 hidden（红队 A）仍是登记基线残留——同机同用户文件系统下无法根治，仍需 §9 第 1 条 Docker Runner（Agent 容器只挂载 workspace/inbox/feedback）落地，这是通往「强对抗可信」的唯一必修项。
-- §3 未实现清单中的容器级强隔离、真实工具权限模型、auto-eval 后台采样、LLM judge 防注入仍未实现。HTTP AgentAdapter 已按窄口径落地（2026-07-07：框架按轮 POST、响应体即提交，`run`/`suite`/`agents-file` 全线支持，端到端测试覆盖 fail→pass/放弃/5xx/不可达路径）——注意其安全边界与 cli 适配器相同（同机信任模型），不改变本报告的隔离结论。
-- command nonce 非密码学强度、run 结束后产物篡改两处残余风险声明继续有效（见 README「安全边界」）。
+- §3 未实现清单中的真实工具权限模型此后已按 http 后端白名单落地（Phase 3）；auto-eval 后台采样、`llm_rubric` LLM 判分及其框架侧防线（权重封顶 / 禁 blocking / fail-closed / 注入降级为数据）均已落地并有 J 组红队 + `LlmRubricRedTeamTest` 守护。HTTP AgentAdapter 已按窄口径落地（2026-07-07：框架按轮 POST、响应体即提交，`run`/`suite`/`agents-file` 全线支持，端到端测试覆盖 fail→pass/放弃/5xx/不可达路径）——注意其安全边界与 cli 适配器相同（同机信任模型）。
+- 默认（非容器）模式下 command nonce 非密码学强度、run 结束后产物篡改两处残余风险声明继续有效（见 README「安全边界」）；其中 nonce 重放已被 §11.5 的 Docker Runner 在容器模式下根治。
+
+### 11.5 P0 闭环：Docker Runner 落地（2026-07-07）
+
+§9 第 1 条与 §6 P0（CLI Agent 同机可读 `hidden/`）已实现根因修复：新增 `--sandbox docker`（仅 `cli` 模式；`run`/`suite`/`agents.yaml` 全线支持），把 Agent 命令包进 `docker run --rm`，容器**只**挂载 `workspace/`(rw)、`inbox/`(rw)、`feedback/`(ro)、`instructions.md`(ro)，`hidden/`/`judge/`/`traces/`/任务目录/宿主家目录一律不挂载，默认 `--network none` 断网。
+
+- **§9 第 1 条（容器只挂 Agent 可触碰区）**：已实现，见 `DockerSandbox` / `DockerAgentAdapter`。
+- **§9 第 3 条（symlink / 相对路径 / find 逃逸）**：已新增红队用例 `A-sym`（workspace 内 symlink 指向宿主 hidden）、`A-find`（全盘 find 评审材料），Docker 就绪时均 DEFENDED。
+- **红队矩阵变化**：Docker 就绪时 A 由 VULNERABLE 翻转为 DEFENDED，另新增 A-sym / A-find 两项 DEFENDED，叠加 J 组 llm_rubric 框架护栏 3 项 DEFENDED，**19 项全 DEFENDED，登记基线 `RT_ALLOWED_VULN` 由 1 降为 0**（基线随 Docker 就绪度自适应：不就绪则回退非容器 A 并保留基线 1）。
+- **成熟度评分修正**：§5「Work / Hidden 隔离」原 2 分（目录分离但无强隔离）——启用 Docker Runner 后升至 4（容器只挂 Agent 可触碰区，红队多角度逃逸均被挡；扣分保留于「非容器默认模式仍无强隔离」与「容器强度依赖 Docker 配置」）。
+- **残余**：real-tool 治理、结果仓库/看板仍待做；容器隔离强度依赖 Docker 配置本身（默认 root-in-container、共享内核），镜像可信由评估方保证。

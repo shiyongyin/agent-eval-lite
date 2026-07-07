@@ -1,0 +1,54 @@
+schema_version: 1
+task_id: config-audit-001
+task_name: 部署配置安全基线审计
+task_type: generic
+tier: regression
+labels: [ops, security-baseline]
+description: >
+  评估 Agent 的跨文件对照与精确判定能力：拿部署配置逐条对照安全基线，找全违规项、
+  不误报合规项，并按基线声明的严重级别指出最该先修的一条。
+
+agent_brief: |
+  工作区里有两份材料：部署配置 `app.yaml` 与安全基线 `security-baseline.md`（六条规则，含严重级别）。
+  逐条对照完成审计：
+
+  - 把**被违反**的规则编号（如 `SEC-9`）按编号升序放入 `answer.violations`（字符串数组，
+    只放违规项，放入合规项按误报扣分）；
+  - 把违规项中**严重级别最高**的一条编号填入 `answer.most_critical`（级别以基线文档声明为准）；
+  - 在 `summary` 里说明审计口径与结论出处（引用两份材料文件名）。
+
+visible_context:
+  - work/app.yaml
+  - work/security-baseline.md
+
+allowed_tools: []
+
+submit:
+  format: json
+  schema: builtin:generic
+  max_attempts: 3
+  cooldown_seconds: 0
+
+judge:
+  type: rules
+  rules_file: hidden/judge.rules.yaml
+  feedback:
+    level: failed_rules
+    include_scores: true
+
+scoring:
+  max_score: 100
+  pass_score: 80
+  selection: best_score
+  dimensions:
+    - name: correctness
+      weight: 70
+    - name: explanation
+      weight: 30
+
+runtime:
+  timeout_minutes: 20
+  attempt_timeout_minutes: 5
+  allow_multi_submit: true
+  auto_eval_interval_seconds: 0
+  resume_enabled: true

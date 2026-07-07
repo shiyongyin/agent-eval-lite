@@ -1,0 +1,2201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentEval-Lite 交互式导览 — 用户 · 产品 · 开发三视角</title>
+<meta name="description" content="AgentEval-Lite 轻量级通用 AI Agent 评估框架的交互式导览：如何接入各类 Agent、如何构建高质量测评集、产品定位与机制、架构设计与二次开发。">
+<style>
+/* ============ 设计令牌 ============ */
+:root{
+  --bg:#0a0e16; --bg2:#0d121d; --panel:#121826; --panel2:#171e30; --panel3:#1c2438;
+  --line:rgba(148,163,184,.14); --line2:rgba(148,163,184,.24);
+  --text:#e2e8f0; --muted:#94a3b8; --faint:#64748b;
+  --teal:#2dd4bf; --teal-dim:rgba(45,212,191,.12);
+  --indigo:#818cf8; --indigo-dim:rgba(129,140,248,.13);
+  --rose:#fb7185; --rose-dim:rgba(251,113,133,.12);
+  --amber:#fbbf24; --amber-dim:rgba(251,191,36,.12);
+  --green:#4ade80; --green-dim:rgba(74,222,128,.12);
+  --grad:linear-gradient(135deg,#6366f1 0%,#2dd4bf 100%);
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Segoe UI","Microsoft YaHei",sans-serif;
+  --r:14px; --r-sm:9px;
+  --shadow:0 10px 34px rgba(2,6,18,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--text);font-family:var(--sans);
+  font-size:15.5px;line-height:1.75;
+  background-image:
+    radial-gradient(1100px 500px at 85% -10%,rgba(99,102,241,.13),transparent 60%),
+    radial-gradient(900px 420px at -10% 8%,rgba(45,212,191,.09),transparent 55%);
+  background-attachment:fixed;
+}
+::selection{background:rgba(99,102,241,.4)}
+a{color:var(--teal);text-decoration:none}
+a:hover{text-decoration:underline}
+b,strong{color:#f1f5f9}
+kbd{font-family:var(--mono);font-size:.82em;background:var(--panel3);border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;padding:1px 6px}
+code{font-family:var(--mono);font-size:.86em;background:rgba(148,163,184,.12);border-radius:5px;padding:1.5px 6px;color:#c7d2fe}
+pre code{background:none;padding:0;color:inherit;font-size:inherit}
+
+/* ============ 顶栏 ============ */
+.app-header{
+  position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:18px;
+  padding:12px clamp(16px,4vw,40px);
+  background:rgba(10,14,22,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:center;gap:10px;white-space:nowrap;cursor:pointer;user-select:none}
+.logo{width:30px;height:30px;border-radius:8px;background:var(--grad);display:grid;place-items:center;flex:none;
+  font-family:var(--mono);font-weight:700;color:#08111f;font-size:15px;box-shadow:0 4px 14px rgba(45,212,191,.35)}
+.brand-name{font-weight:700;letter-spacing:.2px;font-size:15.5px}
+.brand-name small{display:block;font-weight:400;color:var(--faint);font-size:11px;letter-spacing:.4px;line-height:1.2}
+.nav{display:flex;gap:6px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.navbtn{
+  appearance:none;border:1px solid transparent;background:transparent;color:var(--muted);
+  font:inherit;font-size:14px;font-weight:600;padding:7px 15px;border-radius:99px;cursor:pointer;
+  white-space:nowrap;transition:all .18s;
+}
+.navbtn:hover{color:var(--text);background:var(--panel2)}
+.navbtn.active{color:#0b1220;background:var(--grad);box-shadow:0 4px 16px rgba(99,102,241,.4)}
+.navbtn .tag{font-size:10.5px;font-weight:500;opacity:.75;margin-left:4px}
+
+/* ============ 视图与容器 ============ */
+.view{display:none}
+.view.active{display:block;animation:fadeUp .38s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.container{max-width:1180px;margin:0 auto;padding:0 clamp(16px,4vw,40px)}
+
+/* ============ 总览 / Hero ============ */
+.hero{padding:64px 0 30px;text-align:center}
+.eyebrow{display:inline-flex;gap:8px;align-items:center;font-size:12.5px;color:var(--muted);
+  border:1px solid var(--line2);border-radius:99px;padding:5px 14px;background:var(--panel);letter-spacing:.4px}
+.eyebrow .dotpulse{width:7px;height:7px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(45,212,191,.5)}50%{box-shadow:0 0 0 6px rgba(45,212,191,0)}}
+.hero h1{font-size:clamp(34px,5.4vw,54px);letter-spacing:-.5px;margin:20px 0 6px;line-height:1.15}
+.hero h1 .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .lead{font-size:clamp(16px,2.2vw,19px);color:#cbd5e1;max-width:780px;margin:10px auto 4px}
+.hero .sub{color:var(--faint);font-size:14px;max-width:720px;margin:6px auto 0}
+
+/* 核心闭环条 */
+.loopstrip{display:flex;flex-wrap:wrap;justify-content:center;align-items:stretch;gap:10px;margin:34px auto 0;max-width:1020px}
+.lnode{
+  flex:1 1 150px;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px 12px;position:relative;transition:border-color .2s,transform .2s;
+}
+.lnode:hover{border-color:var(--line2);transform:translateY(-2px)}
+.lnode .ln{font-family:var(--mono);font-size:11px;color:var(--indigo);letter-spacing:1px}
+.lnode .lt{font-weight:700;font-size:14.5px;margin:2px 0}
+.lnode .ld{font-size:12px;color:var(--muted);line-height:1.55}
+.larrow{align-self:center;color:var(--faint);font-size:18px;flex:none}
+@media (max-width:820px){.larrow{display:none}}
+
+/* 数据点 */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;margin:36px 0 8px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 10px;text-align:center}
+.stat .v{font-size:24px;font-weight:800;font-family:var(--mono);background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat .k{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* 角色卡 */
+.rolecards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:40px 0 20px}
+.rolecard{
+  text-align:left;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
+  border-radius:18px;padding:24px 22px 20px;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;
+}
+.rolecard::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--grad);opacity:.85}
+.rolecard:hover{transform:translateY(-4px);border-color:var(--line2);box-shadow:var(--shadow)}
+.rolecard .rc-ico{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;color:var(--teal);font-weight:700}
+.rolecard h3{font-size:19px;margin:6px 0 8px}
+.rolecard p{color:var(--muted);font-size:13.5px;margin-bottom:12px}
+.rolecard ul{list-style:none;font-size:13px;color:#cbd5e1}
+.rolecard ul li{padding:3px 0 3px 18px;position:relative}
+.rolecard ul li::before{content:"▸";position:absolute;left:2px;color:var(--indigo)}
+.rolecard .go{display:inline-block;margin-top:14px;font-size:13.5px;font-weight:700;color:var(--teal)}
+.readguide{margin:26px 0 60px}
+
+/* ============ 步进布局 ============ */
+.viewhead{padding:38px 0 6px}
+.viewhead .vh-k{font-family:var(--mono);font-size:12px;letter-spacing:2px;color:var(--teal)}
+.viewhead h1{font-size:clamp(24px,3.4vw,34px);margin:6px 0 6px}
+.viewhead p{color:var(--muted);max-width:820px}
+.steplayout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:30px;padding:24px 0 70px;align-items:start}
+.stepnav{position:sticky;top:76px;display:flex;flex-direction:column;gap:4px}
+.snav-item{
+  display:flex;gap:11px;align-items:flex-start;padding:9px 12px;border-radius:11px;cursor:pointer;
+  border:1px solid transparent;transition:all .16s;background:transparent;text-align:left;font:inherit;color:var(--muted);
+}
+.snav-item:hover{background:var(--panel)}
+.snav-item.active{background:var(--panel2);border-color:var(--line2);color:var(--text)}
+.snav-item.done .snum{background:var(--green-dim);color:var(--green);border-color:transparent}
+.snum{
+  flex:none;width:24px;height:24px;border-radius:50%;border:1px solid var(--line2);display:grid;place-items:center;
+  font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:2px;transition:all .16s;
+}
+.snav-item.active .snum{background:var(--grad);color:#0b1220;border-color:transparent;font-weight:700}
+.snav-item .st{font-size:13.5px;font-weight:600;line-height:1.4}
+.snav-item .sd{font-size:11.5px;color:var(--faint);line-height:1.4}
+.snav-progress{margin-top:14px;font-size:12px;color:var(--faint);padding:0 12px}
+.snav-progress .bar{height:4px;background:var(--panel3);border-radius:99px;margin-top:6px;overflow:hidden}
+.snav-progress .fill{height:100%;background:var(--grad);border-radius:99px;transition:width .3s}
+.spanel{display:none}
+.spanel.active{display:block;animation:fadeUp .32s ease}
+.spanel>h2{font-size:23px;margin:4px 0 4px}
+.spanel>.pdesc{color:var(--muted);margin-bottom:20px;max-width:800px}
+.stepfoot{display:flex;justify-content:space-between;gap:12px;margin-top:34px;border-top:1px solid var(--line);padding-top:18px}
+.btn{
+  appearance:none;font:inherit;font-size:14px;font-weight:700;padding:9px 20px;border-radius:10px;cursor:pointer;
+  border:1px solid var(--line2);background:var(--panel2);color:var(--text);transition:all .16s;
+}
+.btn:hover{border-color:var(--faint)}
+.btn.grad{background:var(--grad);color:#0b1220;border-color:transparent}
+.btn.grad:hover{filter:brightness(1.1)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+@media (max-width:960px){
+  .steplayout{grid-template-columns:1fr}
+  .stepnav{position:static;flex-direction:row;overflow-x:auto;padding-bottom:6px}
+  .snav-item{flex:none;max-width:230px}
+  .snav-item .sd{display:none}
+  .snav-progress{display:none}
+}
+
+/* ============ 通用内容组件 ============ */
+h3.sec{font-size:17px;margin:28px 0 10px;padding-left:12px;border-left:3px solid var(--indigo)}
+h3.sec:first-of-type{margin-top:8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px;margin:12px 0}
+.card h4{font-size:15px;margin-bottom:6px}
+.card p,.card li{font-size:13.8px;color:#cbd5e1}
+.grid{display:grid;gap:12px;margin:12px 0}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.tight p{margin-bottom:6px}
+ul.plain{list-style:none}
+ul.plain li{padding:4px 0 4px 20px;position:relative;font-size:13.8px;color:#cbd5e1}
+ul.plain li::before{content:"▸";position:absolute;left:4px;color:var(--teal)}
+ol.steps{counter-reset:s;list-style:none;margin:10px 0}
+ol.steps>li{counter-increment:s;position:relative;padding:10px 0 10px 44px;font-size:14px;color:#cbd5e1;border-bottom:1px dashed var(--line)}
+ol.steps>li:last-child{border-bottom:none}
+ol.steps>li::before{
+  content:counter(s,decimal-leading-zero);position:absolute;left:0;top:12px;font-family:var(--mono);font-size:12px;
+  width:30px;height:22px;display:grid;place-items:center;background:var(--indigo-dim);color:var(--indigo);
+  border-radius:6px;font-weight:700;
+}
+.badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.4px;border-radius:6px;padding:2px 8px;vertical-align:2px}
+.b-agent{background:var(--teal-dim);color:var(--teal)}
+.b-hidden{background:var(--rose-dim);color:var(--rose)}
+.b-trace{background:var(--amber-dim);color:var(--amber)}
+.b-frame{background:var(--indigo-dim);color:var(--indigo)}
+.b-ok{background:var(--green-dim);color:var(--green)}
+.pill{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;border-radius:99px;padding:2px 11px}
+.p-ok{background:var(--green-dim);color:var(--green)}
+.p-bad{background:var(--rose-dim);color:var(--rose)}
+.p-mid{background:var(--amber-dim);color:var(--amber)}
+.note{border:1px solid var(--line);border-left:3px solid var(--teal);background:var(--panel);border-radius:0 var(--r-sm) var(--r-sm) 0;padding:12px 16px;margin:14px 0;font-size:13.8px;color:#cbd5e1}
+.note.warn{border-left-color:var(--amber)}
+.note.danger{border-left-color:var(--rose)}
+.note .nt{font-weight:800;font-size:12px;letter-spacing:1px;display:block;margin-bottom:3px}
+.note .nt.t-info{color:var(--teal)} .note .nt.t-warn{color:var(--amber)} .note .nt.t-danger{color:var(--rose)}
+
+/* 表格 */
+.tblwrap{overflow-x:auto;margin:12px 0;border:1px solid var(--line);border-radius:var(--r)}
+table.tbl{width:100%;border-collapse:collapse;font-size:13.3px;min-width:560px}
+.tbl th{
+  text-align:left;padding:10px 14px;background:var(--panel2);color:var(--muted);font-size:12px;
+  letter-spacing:.6px;border-bottom:1px solid var(--line2);white-space:nowrap;
+}
+.tbl td{padding:9px 14px;border-bottom:1px solid var(--line);color:#cbd5e1;vertical-align:top}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(148,163,184,.045)}
+.tbl code{white-space:nowrap}
+
+/* 代码块 */
+.codeblock{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:12px 0;background:#0b0f19}
+.codehead{display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:var(--panel2);border-bottom:1px solid var(--line)}
+.codehead .cl{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--faint);text-transform:uppercase}
+.copybtn{appearance:none;font:inherit;font-size:12px;font-weight:600;color:var(--muted);background:transparent;border:1px solid var(--line2);border-radius:7px;padding:2.5px 12px;cursor:pointer;transition:all .15s}
+.copybtn:hover{color:var(--text);border-color:var(--faint)}
+.copybtn.ok{color:var(--green);border-color:var(--green)}
+.codeblock pre{padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:12.8px;line-height:1.72;color:#dbe4f0}
+.tok-c{color:#5b6b84;font-style:italic}
+.tok-s{color:#86efac}
+.tok-k{color:#93c5fd}
+.tok-n{color:#fbbf24}
+.tok-b{color:#f0abfc}
+.tok-p{color:#2dd4bf;font-weight:700}
+.tok-kw{color:#c4b5fd}
+.tok-an{color:#fbbf24}
+
+/* 终端 */
+.term{border:1px solid var(--line2);border-radius:var(--r);overflow:hidden;margin:14px 0;background:#070b12;box-shadow:var(--shadow)}
+.termhead{display:flex;align-items:center;gap:8px;padding:9px 14px;background:#101623;border-bottom:1px solid var(--line)}
+.termhead .dot{width:11px;height:11px;border-radius:50%}
+.termhead .d1{background:#ff5f57}.termhead .d2{background:#febc2e}.termhead .d3{background:#28c840}
+.termhead .tt{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-left:6px}
+.termhead .playbtn{margin-left:auto;appearance:none;font:inherit;font-size:12px;font-weight:700;color:#0b1220;background:var(--grad);border:none;border-radius:7px;padding:3px 14px;cursor:pointer}
+.termhead .playbtn:disabled{opacity:.5;cursor:default}
+.termbody{padding:14px 16px;font-family:var(--mono);font-size:12.6px;line-height:1.8;min-height:230px;max-height:420px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
+.tl-cmd{color:#e2e8f0}
+.tl-cmd .pr{color:var(--teal);font-weight:700}
+.tl-info{color:#5b6b84}
+.tl-ok{color:var(--green)}
+.tl-bad{color:var(--rose)}
+.tl-head{color:var(--indigo);font-weight:700}
+.tl-dim{color:#8ea0bb}
+.cursor{display:inline-block;width:8px;height:15px;background:var(--teal);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* 流程图 */
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin:16px 0 10px}
+.fnode{
+  flex:1 1 122px;min-width:122px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:10px 10px;cursor:pointer;transition:all .18s;position:relative;text-align:left;font:inherit;color:var(--text);
+}
+.fnode:hover{border-color:var(--line2)}
+.fnode.on{border-color:var(--teal);background:linear-gradient(180deg,rgba(45,212,191,.1),var(--panel));box-shadow:0 0 0 1px var(--teal),0 6px 22px rgba(45,212,191,.18)}
+.fnode .fn{font-family:var(--mono);font-size:10.5px;color:var(--indigo);letter-spacing:1px}
+.fnode .ft{font-weight:700;font-size:13px;margin-top:1px;line-height:1.35}
+.fnode .fo{font-size:10.5px;color:var(--faint);margin-top:3px;font-family:var(--mono)}
+.flowdetail{border:1px solid var(--line2);border-radius:var(--r);background:var(--panel2);padding:16px 18px;min-height:118px}
+.flowdetail h4{font-size:15px;margin-bottom:6px}
+.flowdetail h4 .who{font-size:11px;margin-left:8px}
+.flowdetail p{font-size:13.5px;color:#cbd5e1}
+.flowdetail .guard{margin-top:8px;font-size:12.8px;color:var(--rose);background:var(--rose-dim);border-radius:8px;padding:6px 12px;display:inline-block}
+.flowctl{display:flex;gap:10px;align-items:center;margin:8px 0 12px}
+.flowctl .fstep{font-family:var(--mono);font-size:12px;color:var(--faint)}
+
+/* 目录树 */
+.treewrap{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;margin:12px 0}
+@media (max-width:820px){.treewrap{grid-template-columns:1fr}}
+.tree{border:1px solid var(--line);border-radius:var(--r);background:#0b0f19;padding:14px 10px;font-family:var(--mono);font-size:12.8px;line-height:1.9;overflow-x:auto}
+.tnode{display:flex;gap:8px;align-items:baseline;padding:1px 8px;border-radius:7px;cursor:pointer;white-space:nowrap;border:1px solid transparent}
+.tnode:hover{background:var(--panel2)}
+.tnode.on{background:var(--panel3);border-color:var(--line2)}
+.tnode .ti{color:var(--faint)}
+.tnode .tn{color:#dbe4f0}
+.tnode .tb{font-family:var(--sans)}
+.tnotebox{border:1px solid var(--line2);border-radius:var(--r);background:var(--panel2);padding:16px 18px;align-self:start;position:sticky;top:86px}
+.tnotebox h4{font-size:14.5px;font-family:var(--mono);margin-bottom:6px;color:var(--teal)}
+.tnotebox p{font-size:13.5px;color:#cbd5e1}
+
+/* 选项行 / 开关 */
+.optbar{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.opt{
+  appearance:none;font:inherit;font-size:13px;font-weight:600;color:var(--muted);background:var(--panel);
+  border:1px solid var(--line);border-radius:99px;padding:6px 16px;cursor:pointer;transition:all .15s;
+}
+.opt:hover{color:var(--text)}
+.opt.on{color:#0b1220;background:var(--grad);border-color:transparent;font-weight:700}
+.switchrow{display:flex;align-items:center;gap:10px;font-size:13.5px;color:#cbd5e1;margin:8px 0}
+.switch{position:relative;width:40px;height:22px;flex:none;cursor:pointer}
+.switch input{opacity:0;width:0;height:0}
+.switch .sl{position:absolute;inset:0;background:var(--panel3);border:1px solid var(--line2);border-radius:99px;transition:.2s}
+.switch .sl::before{content:"";position:absolute;width:15px;height:15px;left:3px;top:2.5px;border-radius:50%;background:var(--faint);transition:.2s}
+.switch input:checked + .sl{background:rgba(45,212,191,.25);border-color:var(--teal)}
+.switch input:checked + .sl::before{transform:translateX(18px);background:var(--teal)}
+
+/* 评分沙盘 */
+.calc{border:1px solid var(--line2);border-radius:var(--r);overflow:hidden;margin:14px 0}
+.calc .chead{padding:10px 16px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.crow:hover{background:rgba(148,163,184,.04)}
+.crow .cid{font-family:var(--mono);font-size:12.5px;font-weight:700;min-width:170px}
+.crow .cdim{font-size:11px}
+.crow .cpts{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:auto}
+.calcout{padding:16px;background:var(--panel)}
+.dimbar{display:grid;grid-template-columns:110px 1fr 86px;gap:10px;align-items:center;margin:7px 0;font-size:12.8px}
+.dimbar .db-track{height:9px;background:var(--panel3);border-radius:99px;overflow:hidden}
+.dimbar .db-fill{height:100%;background:var(--grad);border-radius:99px;transition:width .35s}
+.dimbar .db-v{font-family:var(--mono);color:var(--muted);text-align:right}
+.verdict{margin-top:14px;border-radius:11px;padding:12px 16px;font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.verdict .vs{font-family:var(--mono);font-size:22px}
+.verdict.pass{background:var(--green-dim);color:var(--green);border:1px solid rgba(74,222,128,.35)}
+.verdict.fail{background:var(--rose-dim);color:var(--rose);border:1px solid rgba(251,113,133,.35)}
+.verdict small{font-weight:500;font-size:12.5px;opacity:.85}
+
+/* chips 过滤 + check 卡 */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.chip{appearance:none;font:inherit;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:4.5px 14px;cursor:pointer;transition:all .15s}
+.chip.on{color:#0b1220;background:var(--teal);border-color:transparent}
+.checkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:10px;margin:10px 0}
+.checkcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;transition:all .16s}
+.checkcard:hover{border-color:var(--line2);transform:translateY(-1px)}
+.checkcard.sel{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal)}
+.checkcard .cc-n{font-family:var(--mono);font-size:13px;font-weight:700;color:#c7d2fe}
+.checkcard .cc-d{font-size:12.3px;color:var(--muted);margin-top:3px;line-height:1.55}
+.checkdetail{border:1px solid var(--line2);border-radius:var(--r);background:var(--panel2);padding:16px 18px;margin:12px 0}
+.checkdetail h4{font-family:var(--mono);font-size:15px;color:var(--teal);margin-bottom:6px}
+.checkdetail p{font-size:13.5px;color:#cbd5e1;margin-bottom:8px}
+
+/* 概念卡 / 手风琴 */
+.concepts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:14px 0}
+.concept{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;cursor:pointer;transition:all .18s}
+.concept:hover{border-color:var(--line2)}
+.concept.open{border-color:var(--indigo);background:linear-gradient(180deg,rgba(129,140,248,.07),var(--panel))}
+.concept .ch{display:flex;align-items:center;gap:10px}
+.concept .ci{font-family:var(--mono);font-size:11px;color:var(--indigo);font-weight:700;letter-spacing:1px;flex:none}
+.concept h4{font-size:15px;flex:1}
+.concept .caret{color:var(--faint);transition:transform .2s;flex:none}
+.concept.open .caret{transform:rotate(90deg)}
+.concept .cbody{display:none;margin-top:10px;font-size:13.5px;color:#cbd5e1;border-top:1px dashed var(--line);padding-top:10px}
+.concept.open .cbody{display:block;animation:fadeUp .25s ease}
+.concept .cbody .how{display:block;margin-top:8px;font-size:12.5px;color:var(--teal);font-family:var(--mono)}
+details.acc{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);margin:10px 0;overflow:hidden}
+details.acc summary{cursor:pointer;padding:13px 18px;font-weight:700;font-size:14.5px;list-style:none;display:flex;align-items:center;gap:10px}
+details.acc summary::-webkit-details-marker{display:none}
+details.acc summary::before{content:"▸";color:var(--teal);transition:transform .2s}
+details.acc[open] summary::before{transform:rotate(90deg)}
+details.acc summary .lbl{font-family:var(--mono);font-size:11px;color:var(--indigo);letter-spacing:1px}
+details.acc .accbody{padding:2px 18px 16px;border-top:1px dashed var(--line)}
+details.acc .accbody p,details.acc .accbody li{font-size:13.8px;color:#cbd5e1}
+
+/* 时间线 */
+.timeline{position:relative;margin:20px 0 10px;padding-left:26px}
+.timeline::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:linear-gradient(180deg,var(--indigo),var(--teal))}
+.tl-item{position:relative;padding:0 0 22px 14px}
+.tl-item:last-child{padding-bottom:0}
+.tl-item .tl-dot{position:absolute;left:-24px;top:5px;width:14px;height:14px;border-radius:50%;background:var(--bg);border:3px solid var(--teal)}
+.tl-item.pending .tl-dot{border-color:var(--faint)}
+.tl-item h4{font-size:14.5px}
+.tl-item h4 .ph{font-family:var(--mono);color:var(--indigo);margin-right:8px;font-size:12.5px}
+.tl-item p{font-size:13.3px;color:var(--muted)}
+
+/* 模块地图 */
+.mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(262px,1fr));gap:11px;margin:14px 0}
+.mod{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 15px;cursor:pointer;transition:all .16s}
+.mod:hover{border-color:var(--line2)}
+.mod.open{grid-column:1/-1;border-color:var(--indigo)}
+.mod .mh{display:flex;align-items:center;gap:9px}
+.mod .caret{transition:transform .2s}
+.mod.open .caret{transform:rotate(90deg)}
+.fnode .fn,.fnode .ft,.fnode .fo{display:block}
+.mod .mn{font-family:var(--mono);font-size:13.5px;font-weight:700;color:#c7d2fe}
+.mod .ms{font-size:12.3px;color:var(--muted);margin-top:3px;line-height:1.55}
+.mod .mbody{display:none;margin-top:10px;border-top:1px dashed var(--line);padding-top:10px;font-size:13.2px;color:#cbd5e1}
+.mod.open .mbody{display:block;animation:fadeUp .22s ease}
+.mod .mbody code{font-size:.84em}
+
+/* 红队矩阵 */
+.rtgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:11px;margin:12px 0}
+.rtcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 15px}
+.rtcard .rt-a{font-size:13.8px;font-weight:700}
+.rtcard .rt-d{font-size:12.8px;color:var(--muted);margin:6px 0 8px;line-height:1.6}
+.rtcard .rt-id{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.5px}
+
+/* pass^k */
+.pkwrap{display:flex;flex-wrap:wrap;gap:18px;align-items:center;margin:12px 0}
+.pkwrap input[type=range]{accent-color:#2dd4bf;width:180px}
+.pkagents{display:grid;gap:10px;margin:10px 0;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.pkagent{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 15px}
+.pkagent .pk-n{font-family:var(--mono);font-size:13px;font-weight:700}
+.pkruns{display:flex;gap:6px;margin:8px 0}
+.pkrun{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-family:var(--mono);font-size:12px;font-weight:800}
+.pkrun.y{background:var(--green-dim);color:var(--green)}
+.pkrun.n{background:var(--rose-dim);color:var(--rose)}
+.pkrun.off{opacity:.18}
+
+/* check 全景表 */
+.cklink{font-family:var(--mono);font-size:12.5px;color:var(--teal);cursor:pointer;border-bottom:1px dashed rgba(45,212,191,.45)}
+.cklink:hover{color:#8ff2e4;border-bottom-color:#8ff2e4}
+.tbl .dim{font-size:11.5px;color:var(--faint);font-weight:400}
+
+/* 架构图 / 流程图（SVG） */
+.archwrap{border:1px solid var(--line);border-radius:var(--r);background:#0b0f19;padding:14px 10px 8px;margin:14px 0;overflow-x:auto}
+.archwrap svg{width:100%;min-width:760px;height:auto;display:block}
+.archwrap text{font-family:var(--sans)}
+.archwrap .zt{font-size:12.5px;font-weight:700;fill:#94a3b8;letter-spacing:1.5px}
+.archwrap .bt{font-size:12.5px;font-weight:700;fill:#e8eef7}
+.archwrap .bts{font-size:11px}
+.archwrap .bs{font-size:10px;fill:#8ea0bb}
+.archwrap .al{font-size:10px;fill:#94a3b8}
+.archwrap .lg{font-size:11px;fill:#94a3b8}
+.archwrap .zone{fill:rgba(148,163,184,.045);stroke:rgba(148,163,184,.22)}
+.archwrap .arrow{stroke:#5b6b84;stroke-width:1.4;fill:none}
+.archwrap .arrow.rose{stroke:#fb7185;stroke-dasharray:4 3}
+.archwrap .arrow.teal{stroke:#2dd4bf}
+.archwrap .bx-t{fill:rgba(45,212,191,.10);stroke:rgba(45,212,191,.55)}
+.archwrap .bx-r{fill:rgba(251,113,133,.10);stroke:rgba(251,113,133,.55)}
+.archwrap .bx-i{fill:#161d2e;stroke:rgba(129,140,248,.5)}
+.archwrap .bx-a{fill:rgba(251,191,36,.10);stroke:rgba(251,191,36,.5)}
+.archwrap .bx-n{fill:#141a2a;stroke:rgba(148,163,184,.35)}
+.archwrap g[data-arch]{cursor:pointer}
+.archwrap g[data-arch]:hover rect{filter:brightness(1.4)}
+.archwrap g[data-arch].sel rect{stroke-width:2.2}
+.archdetail{border:1px solid var(--line2);border-radius:var(--r);background:var(--panel2);padding:14px 18px;margin:0 0 14px;min-height:64px}
+.archdetail h4{font-size:14.5px;margin-bottom:4px;font-family:var(--mono);color:var(--teal)}
+.archdetail p{font-size:13.5px;color:#cbd5e1}
+.ovsec{text-align:left;margin:46px 0 0}
+.ovsec>h2{font-size:22px;margin-bottom:4px}
+.ovsec>h2 .ok{font-family:var(--mono);font-size:12px;color:var(--teal);letter-spacing:2px;display:block;margin-bottom:4px}
+.ovsec>.od{color:var(--muted);font-size:14px;max-width:860px;margin-bottom:10px}
+
+/* 页脚 */
+.footer{border-top:1px solid var(--line);padding:30px clamp(16px,4vw,40px) 44px;color:var(--faint);font-size:13px;margin-top:30px}
+.footer .frow{max-width:1180px;margin:0 auto;display:flex;flex-wrap:wrap;gap:20px;justify-content:space-between}
+.footer a{color:var(--muted)}
+.rev{opacity:0;transform:translateY(12px)}
+.rev.in{opacity:1;transform:none;transition:opacity .5s ease,transform .5s ease}
+</style>
+</head>
+<body>
+
+<!-- ================= 顶栏 ================= -->
+<header class="app-header">
+  <div class="brand" data-go="overview">
+    <div class="logo">&gt;_</div>
+    <div class="brand-name">AgentEval-Lite<small>交互式导览 · v0.1.0</small></div>
+  </div>
+  <nav class="nav" id="mainNav">
+    <button class="navbtn active" data-go="overview">总览</button>
+    <button class="navbtn" data-go="user">用户视角<span class="tag">接入与建题</span></button>
+    <button class="navbtn" data-go="product">产品视角<span class="tag">定位与机制</span></button>
+    <button class="navbtn" data-go="dev">开发视角<span class="tag">架构与扩展</span></button>
+  </nav>
+</header>
+
+<!-- ================= 总览 ================= -->
+<section class="view active" id="view-overview">
+  <div class="container">
+    <div class="hero">
+      <span class="eyebrow"><span class="dotpulse"></span>Java 17 · 单 jar · 零外部服务依赖 · 本页离线可用</span>
+      <h1><span class="grad">AgentEval-Lite</span></h1>
+      <p class="lead">轻量级、通用的 AI Agent 评估框架：给任意 Agent 出一道<b>有隐藏标准答案</b>的题，全程留痕、多轮受控反馈，产出<b>可复现</b>的评分报告。</p>
+      <p class="sub">参考 EdgeBench / SForge 的核心思想（Work/Judge 隔离、结构化提交、隐藏判分、过程留痕），做成「目录即隔离」的本地落地版。代码修复、API payload 生成、文档分析、工具调用纪律、需求评审——任何可结构化验收的任务都装进同一套模型。</p>
+
+      <div class="loopstrip">
+        <div class="lnode"><div class="ln">STEP 1</div><div class="lt">出题</div><div class="ld">task.yaml + 可见材料 work/ + 隐藏评审 hidden/</div></div>
+        <div class="larrow">→</div>
+        <div class="lnode"><div class="ln">STEP 2</div><div class="lt">接入 Agent</div><div class="ld">manual / scripted / cli / http 四种适配，可选 Docker 沙箱</div></div>
+        <div class="larrow">→</div>
+        <div class="lnode"><div class="ln">STEP 3</div><div class="lt">提交 × 反馈循环</div><div class="ld">JSON 写进 inbox/，隐藏判分后回传受控反馈，改了再交</div></div>
+        <div class="larrow">→</div>
+        <div class="lnode"><div class="ln">STEP 4</div><div class="lt">可复现报告</div><div class="ld">分数 + 维度 + 轨迹 + 指纹，离线可复算，同输入必同分</div></div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="v">0</div><div class="k">外部服务依赖</div></div>
+        <div class="stat"><div class="v">1</div><div class="k">个 shaded jar</div></div>
+        <div class="stat"><div class="v">4</div><div class="k">种 Agent 接入</div></div>
+        <div class="stat"><div class="v">10</div><div class="k">个子命令</div></div>
+        <div class="stat"><div class="v">15</div><div class="k">种判分 check</div></div>
+        <div class="stat"><div class="v">17</div><div class="k">类留痕事件</div></div>
+        <div class="stat"><div class="v">5</div><div class="k">个内置任务</div></div>
+        <div class="stat"><div class="v">159</div><div class="k">项测试</div></div>
+        <div class="stat"><div class="v">19</div><div class="k">项红队演练</div></div>
+      </div>
+
+      <!-- ===== 总览 · 整体说明 ===== -->
+      <div class="ovsec">
+        <h2><span class="ok">WHAT / HOW / OUTPUT</span>三句话说清整个框架</h2>
+        <p class="od">评估的根本难题是：Agent 的话不能全信。AgentEval-Lite 把「考试」这件事工程化——考题与评分标准分离、答题通道唯一、判分过程留痕、结果可复算。</p>
+        <div class="grid g3">
+          <div class="card tight"><h4><span class="badge b-agent">评什么</span></h4><p><b>被评对象</b>：任何能产出「结构化提交」的 Agent——人工、回放脚本、命令行 Agent（claude / codex / cursor-agent / 自研）、HTTP 服务。<br><b>能出的题</b>：任何可结构化验收的任务——代码修复、API payload 生成、文档分析、工具调用纪律、需求评审……内置 5 个示例任务开箱即用。</p></div>
+          <div class="card tight"><h4><span class="badge b-frame">怎么评</span></h4><p>给 Agent 一道<b>带隐藏标准答案</b>的题：它在隔离工作区干活，把 JSON 答卷写进 inbox；隐藏规则引擎（15 种 check）判分后回传「指方向不给答案」的受控反馈，多轮迭代直到达线或轮次用尽。全程 17 类事件 HMAC 签名留痕，编造过程无效。</p></div>
+          <div class="card tight"><h4><span class="badge b-trace">产出什么</span></h4><p>每次评估一个自包含的 run 目录：<code>report.md/json</code>（分数、维度、轮次轨迹、安全项）+ 签名 <code>trace.jsonl</code> + 可复现指纹（随时离线复算，同输入必同分）。批跑得到任务 × Agent 矩阵、pass^k 可靠性排名与跨 run 趋势。</p></div>
+        </div>
+      </div>
+
+      <!-- ===== 总览 · 架构图 ===== -->
+      <div class="ovsec">
+        <h2><span class="ok">ARCHITECTURE</span>架构总览（点击任意模块看职责）</h2>
+        <p class="od">三个物理分区：左边是<b>人工出题区</b>（任务即目录），中间是<b>评估引擎</b>（单 jar 进程，四段流水），右边是<b>被测 Agent 黑盒</b>与它唯一能触碰的产物区。红色 = Agent 永远看不到的评审资产。</p>
+        <div class="archwrap">
+        <svg id="archSvg" viewBox="0 0 980 640" role="img" aria-label="AgentEval-Lite 架构图">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#5b6b84"/></marker>
+            <marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#fb7185"/></marker>
+            <marker id="aht" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2dd4bf"/></marker>
+          </defs>
+          <!-- 区域 -->
+          <text class="zt" x="116" y="44" text-anchor="middle">任务目录 · 人工出题</text>
+          <rect class="zone" x="14" y="56" width="204" height="304" rx="14"/>
+          <text class="zt" x="477" y="44" text-anchor="middle">AGENTEVAL-LITE 引擎 · 单 JAR 进程</text>
+          <rect class="zone" x="262" y="56" width="430" height="444" rx="14"/>
+          <text class="zt" x="851" y="44" text-anchor="middle">被测 AGENT · 黑盒</text>
+          <rect class="zone" x="736" y="56" width="230" height="240" rx="14"/>
+          <text class="zt" x="851" y="346" text-anchor="middle">runs/&lt;run-id&gt;/ 产物</text>
+          <rect class="zone" x="736" y="354" width="230" height="216" rx="14"/>
+          <!-- 左：任务目录 -->
+          <g data-arch="taskyaml"><rect class="bx-t" x="30" y="76" width="172" height="54" rx="9"/><text class="bt" x="116" y="98" text-anchor="middle">task.yaml</text><text class="bs" x="116" y="114" text-anchor="middle">题面 · 提交契约 · 评分维度</text></g>
+          <g data-arch="work"><rect class="bx-t" x="30" y="142" width="172" height="54" rx="9"/><text class="bt" x="116" y="164" text-anchor="middle">work/ 可见材料</text><text class="bs" x="116" y="180" text-anchor="middle">文档 · 代码 · 数据（脱敏）</text></g>
+          <g data-arch="hidden"><rect class="bx-r" x="30" y="208" width="172" height="66" rx="9"/><text class="bt" x="116" y="230" text-anchor="middle">hidden/ 评审私有</text><text class="bs" x="116" y="246" text-anchor="middle">judge.rules.yaml · expected/</text><text class="bs" x="116" y="260" text-anchor="middle">tools/ 应答库 · canary</text></g>
+          <g data-arch="samples"><rect class="bx-n" x="30" y="286" width="172" height="54" rx="9"/><text class="bt" x="116" y="308" text-anchor="middle">samples/ 回放样例</text><text class="bs" x="116" y="324" text-anchor="middle">正反例提交 + replay.yaml</text></g>
+          <!-- 中：引擎四段 -->
+          <text class="al" x="278" y="86">① 准备</text>
+          <g data-arch="tsl"><rect class="bx-i" x="278" y="94" width="126" height="56" rx="9"/><text class="bt" x="341" y="117" text-anchor="middle">TaskSpecLoader</text><text class="bs" x="341" y="134" text-anchor="middle">装载 · fail-fast 校验</text></g>
+          <g data-arch="wm"><rect class="bx-i" x="419" y="94" width="126" height="56" rx="9"/><text class="bt bts" x="482" y="117" text-anchor="middle">WorkspaceManager</text><text class="bs" x="482" y="134" text-anchor="middle">work→workspace + 指纹</text></g>
+          <g data-arch="ir"><rect class="bx-i" x="560" y="94" width="126" height="56" rx="9"/><text class="bt bts" x="623" y="117" text-anchor="middle">InstructionsRenderer</text><text class="bs" x="623" y="134" text-anchor="middle">渲染任务说明</text></g>
+          <text class="al" x="278" y="196">② 执行</text>
+          <g data-arch="rm"><rect class="bx-i" x="278" y="204" width="126" height="56" rx="9"/><text class="bt" x="341" y="227" text-anchor="middle">RunManager</text><text class="bs" x="341" y="244" text-anchor="middle">attempt 主循环</text></g>
+          <g data-arch="aa"><rect class="bx-i" x="419" y="204" width="126" height="56" rx="9"/><text class="bt" x="482" y="227" text-anchor="middle">AgentAdapter</text><text class="bs" x="482" y="244" text-anchor="middle">manual·scripted·cli·http</text></g>
+          <g data-arch="tg"><rect class="bx-i" x="560" y="204" width="126" height="56" rx="9"/><text class="bt bts" x="623" y="227" text-anchor="middle">ToolGatewayServer</text><text class="bs" x="623" y="244" text-anchor="middle">常驻网关 · 白名单</text></g>
+          <text class="al" x="278" y="306">③ 评审</text>
+          <g data-arch="sm"><rect class="bx-i" x="278" y="314" width="126" height="56" rx="9"/><text class="bt bts" x="341" y="337" text-anchor="middle">SubmissionManager</text><text class="bs" x="341" y="354" text-anchor="middle">信封+分型双校验</text></g>
+          <g data-arch="rj"><rect class="bx-i" x="419" y="314" width="126" height="56" rx="9"/><text class="bt" x="482" y="337" text-anchor="middle">RulesJudge</text><text class="bs" x="482" y="354" text-anchor="middle">15 种 check 判分</text></g>
+          <g data-arch="fp"><rect class="bx-i" x="560" y="314" width="126" height="56" rx="9"/><text class="bt" x="623" y="337" text-anchor="middle">FeedbackPolicy</text><text class="bs" x="623" y="354" text-anchor="middle">裁剪受控反馈</text></g>
+          <text class="al" x="278" y="416">④ 留痕与产出</text>
+          <g data-arch="tl"><rect class="bx-a" x="278" y="424" width="126" height="56" rx="9"/><text class="bt" x="341" y="447" text-anchor="middle">TraceLogger</text><text class="bs" x="341" y="464" text-anchor="middle">HMAC 签名留痕</text></g>
+          <g data-arch="rss"><rect class="bx-i" x="419" y="424" width="126" height="56" rx="9"/><text class="bt" x="482" y="447" text-anchor="middle">RunStateStore</text><text class="bs" x="482" y="464" text-anchor="middle">逐轮快照 · resume</text></g>
+          <g data-arch="rpt"><rect class="bx-i" x="560" y="424" width="126" height="56" rx="9"/><text class="bt" x="623" y="447" text-anchor="middle">ReportGenerator</text><text class="bs" x="623" y="464" text-anchor="middle">report.json / md</text></g>
+          <!-- 右上：Agent -->
+          <g data-arch="agents">
+            <rect class="bx-t" x="750" y="74" width="100" height="40" rx="8"/><text class="bt" x="800" y="99" text-anchor="middle">manual 人工</text>
+            <rect class="bx-t" x="852" y="74" width="100" height="40" rx="8"/><text class="bt" x="902" y="99" text-anchor="middle">scripted 回放</text>
+            <rect class="bx-t" x="750" y="122" width="100" height="40" rx="8"/><text class="bt" x="800" y="147" text-anchor="middle">cli 命令行</text>
+            <rect class="bx-t" x="852" y="122" width="100" height="40" rx="8"/><text class="bt" x="902" y="147" text-anchor="middle">http 服务</text>
+          </g>
+          <g data-arch="sandbox"><rect x="750" y="176" width="202" height="108" rx="9" fill="rgba(45,212,191,.04)" stroke="rgba(45,212,191,.6)" stroke-dasharray="5 4"/><text class="bt" x="851" y="198" text-anchor="middle">--sandbox docker（可选）</text><text class="bs" x="851" y="218" text-anchor="middle">容器只挂 4 个可触碰点</text><text class="bs" x="851" y="234" text-anchor="middle">hidden 不在容器文件系统里</text><text class="bs" x="851" y="250" text-anchor="middle">默认 --network none 断网</text></g>
+          <!-- 右下：runs -->
+          <g data-arch="r-agent"><rect class="bx-t" x="750" y="368" width="202" height="56" rx="9"/><text class="bt" x="851" y="390" text-anchor="middle">workspace · inbox · feedback</text><text class="bs" x="851" y="407" text-anchor="middle">Agent 可触碰区</text></g>
+          <g data-arch="r-judge"><rect class="bx-r" x="750" y="434" width="202" height="56" rx="9"/><text class="bt" x="851" y="456" text-anchor="middle">judge/ · traces/ · run_state</text><text class="bs" x="851" y="473" text-anchor="middle">评审禁区（Agent 不可见）</text></g>
+          <g data-arch="r-report"><rect class="bx-a" x="750" y="500" width="202" height="56" rx="9"/><text class="bt" x="851" y="522" text-anchor="middle">report.json · report.md</text><text class="bs" x="851" y="539" text-anchor="middle">评估结论 · 可复现指纹</text></g>
+          <!-- 箭头 -->
+          <path class="arrow" d="M218 130 L258 130" marker-end="url(#ah)"/><text class="al" x="238" y="122" text-anchor="middle">装载·复制</text>
+          <path class="arrow rose" d="M218 241 C246 241 240 342 258 342" marker-end="url(#ahr)"/><text class="al" x="230" y="296" text-anchor="middle" fill="#fb7185">仅评审装载</text>
+          <path class="arrow" d="M692 118 L732 118" marker-end="url(#ah)"/><text class="al" x="714" y="110" text-anchor="middle">说明·反馈</text>
+          <path class="arrow teal" d="M736 158 L696 158" marker-end="url(#aht)"/><text class="al" x="714" y="176" text-anchor="middle" fill="#2dd4bf">提交 JSON</text>
+          <path class="arrow" d="M736 232 L696 232" marker-start="url(#ah)" marker-end="url(#ah)"/><text class="al" x="714" y="224" text-anchor="middle">tool call</text>
+          <path class="arrow" d="M692 452 L732 452" marker-end="url(#ah)"/><text class="al" x="714" y="444" text-anchor="middle">留痕·报告</text>
+          <path class="arrow teal" d="M772 296 L772 364" marker-end="url(#aht)"/><text class="al" x="782" y="316" fill="#2dd4bf">直接读写</text>
+          <!-- 图例 -->
+          <rect class="bx-t" x="30" y="600" width="13" height="13" rx="3"/><text class="lg" x="50" y="611">Agent 可见 / 可触碰</text>
+          <rect class="bx-r" x="200" y="600" width="13" height="13" rx="3"/><text class="lg" x="220" y="611">评审私有 · Agent 永不可见</text>
+          <rect class="bx-i" x="420" y="600" width="13" height="13" rx="3"/><text class="lg" x="440" y="611">框架组件（单进程）</text>
+          <rect class="bx-a" x="600" y="600" width="13" height="13" rx="3"/><text class="lg" x="620" y="611">签名留痕 / 报告产物</text>
+          <rect x="780" y="600" width="13" height="13" rx="3" fill="rgba(45,212,191,.04)" stroke="rgba(45,212,191,.6)" stroke-dasharray="4 3"/><text class="lg" x="800" y="611">Docker 沙箱（可选）</text>
+        </svg>
+        </div>
+        <div class="archdetail" id="archDetail"><h4>点击图中任意模块</h4><p>查看它的职责、解决什么问题。想看代码级细节：开发视角第 2 步有 12 个包的完整模块地图。</p></div>
+      </div>
+
+      <!-- ===== 总览 · 评估循环流程图 ===== -->
+      <div class="ovsec">
+        <h2><span class="ok">EVALUATION LOOP</span>一次评估的循环</h2>
+        <p class="od">核心是一个「提交 × 受控反馈」的多轮循环：Agent 说「做完了」不算数，判分说了算。</p>
+        <div class="archwrap">
+        <svg viewBox="0 0 980 252" role="img" aria-label="评估循环流程图">
+          <defs>
+            <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#5b6b84"/></marker>
+            <marker id="ah2t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2dd4bf"/></marker>
+            <marker id="ah2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#fbbf24"/></marker>
+          </defs>
+          <g><rect class="bx-i" x="16" y="44" width="118" height="64" rx="9"/><text class="bs" x="26" y="62">STEP 1</text><text class="bt" x="75" y="80" text-anchor="middle">渲染说明</text><text class="bs" x="75" y="96" text-anchor="middle">instructions.md</text></g>
+          <g><rect class="bx-t" x="146" y="44" width="118" height="64" rx="9"/><text class="bs" x="156" y="62">STEP 2</text><text class="bt" x="205" y="80" text-anchor="middle">Agent 干活</text><text class="bs" x="205" y="96" text-anchor="middle">workspace · 工具调用</text></g>
+          <g><rect class="bx-t" x="276" y="44" width="118" height="64" rx="9"/><text class="bs" x="286" y="62">STEP 3</text><text class="bt" x="335" y="80" text-anchor="middle">写提交</text><text class="bs" x="335" y="96" text-anchor="middle">inbox/attempt_N.json</text></g>
+          <g><rect class="bx-i" x="406" y="44" width="118" height="64" rx="9"/><text class="bs" x="416" y="62">STEP 4</text><text class="bt" x="465" y="80" text-anchor="middle">双 Schema 校验</text><text class="bs" x="465" y="96" text-anchor="middle">信封 + 分型</text></g>
+          <g><rect class="bx-r" x="536" y="44" width="118" height="64" rx="9"/><text class="bs" x="546" y="62">STEP 5</text><text class="bt" x="595" y="80" text-anchor="middle">隐藏判分</text><text class="bs" x="595" y="96" text-anchor="middle">15 种 check · blocking</text></g>
+          <g><rect class="bx-i" x="666" y="44" width="118" height="64" rx="9"/><text class="bs" x="676" y="62">STEP 6</text><text class="bt" x="725" y="80" text-anchor="middle">受控反馈</text><text class="bs" x="725" y="96" text-anchor="middle">指方向 · 不给答案</text></g>
+          <g><rect class="bx-a" x="796" y="44" width="118" height="64" rx="9"/><text class="bs" x="806" y="62">END</text><text class="bt" x="855" y="80" text-anchor="middle">终局报告</text><text class="bs" x="855" y="96" text-anchor="middle">best attempt · 指纹</text></g>
+          <path class="arrow" d="M134 76 L142 76" marker-end="url(#ah2)"/>
+          <path class="arrow" d="M264 76 L272 76" marker-end="url(#ah2)"/>
+          <path class="arrow" d="M394 76 L402 76" marker-end="url(#ah2)"/>
+          <path class="arrow" d="M524 76 L532 76" marker-end="url(#ah2)"/>
+          <path class="arrow" d="M654 76 L662 76" marker-end="url(#ah2)"/><text class="al" x="658" y="128" text-anchor="middle">未达线</text>
+          <path class="arrow" d="M595 44 C595 14 855 14 855 40" marker-end="url(#ah2a)" stroke-dasharray="4 3"/><text class="al" x="725" y="24" text-anchor="middle">达线 / 轮次或时间用尽</text>
+          <path class="arrow teal" d="M725 108 C725 186 236 186 207 112" marker-end="url(#ah2t)"/><text class="al" x="466" y="196" text-anchor="middle" fill="#2dd4bf">未达线且有余量 → 携反馈进入下一轮（Agent 自称完成也会被 stop-hook 拉回）</text>
+          <text class="al" x="465" y="230" text-anchor="middle">校验失败（invalid）的提交也会收到 schema 错误反馈并消耗一轮；全过程 17 类事件签名留痕</text>
+        </svg>
+        </div>
+        <div class="note"><span class="nt t-info">想看每个阶段的细节？</span>产品视角第 3 步有逐阶段可播放的运转动画（含每阶段的执行者与防作弊落点）。<a href="#" data-jump="product:2">直接跳过去 →</a></div>
+      </div>
+
+      <div class="rolecards">
+        <div class="rolecard" data-go="user">
+          <div class="rc-ico">USER ▸ 评估者 / 出题人</div>
+          <h3>用户视角</h3>
+          <p>我要把手上的 Agent 接进来跑分，并为自己的业务建一套高质量测评集。</p>
+          <ul>
+            <li>5 分钟跑通第一个评估</li>
+            <li>四种接入方式 + Docker 沙箱（含命令生成器）</li>
+            <li>建题五步法 + 15 种 check + 评分沙盘</li>
+            <li>批跑、pass^k 可靠性、多 Agent 对比</li>
+            <li>速查手册：FAQ · 命令表 · 常见坑 · 名词表</li>
+          </ul>
+          <span class="go">进入用户视角 →</span>
+        </div>
+        <div class="rolecard" data-go="product">
+          <div class="rc-ico">PRODUCT ▸ 决策 / 选型</div>
+          <h3>产品视角</h3>
+          <p>我要判断它解决什么问题、和业界框架什么关系、机制是否可信。</p>
+          <ul>
+            <li>定位：有什么用、解决什么问题、怎么解决</li>
+            <li>八大核心机制（点开即懂）</li>
+            <li>一次评估的运转原理（可播放动画）</li>
+            <li>安全边界的诚实声明 + 路线图</li>
+          </ul>
+          <span class="go">进入产品视角 →</span>
+        </div>
+        <div class="rolecard" data-go="dev">
+          <div class="rc-ico">DEV ▸ 架构 / 二次开发</div>
+          <h3>开发视角</h3>
+          <p>我要理解实现原理与模块边界，然后加适配器、加 check、加任务。</p>
+          <ul>
+            <li>技术栈与设计原则（为什么这么简单）</li>
+            <li>12 个包的模块地图（点开看关键类）</li>
+            <li>一次 run 的完整代码路径</li>
+            <li>四条二次开发路线 + 测试/CI 约定</li>
+          </ul>
+          <span class="go">进入开发视角 →</span>
+        </div>
+      </div>
+
+      <div class="readguide">
+        <div class="note" style="text-align:left">
+          <span class="nt t-info">阅读建议（循序渐进）</span>
+          第一次接触：看完上面的说明、架构图与循环图，进「用户视角」走完第 1~3 步，你就能跑通评估并读懂报告。要为业务建题：直接看「用户视角」第 4 步。遇到问题或想查命令/术语：「用户视角」第 6 步速查手册。要向团队汇报或做选型：看「产品视角」全程约 10 分钟。要改代码：先看「产品视角」第 3 步的运转原理，再进「开发视角」。左右方向键 <kbd>←</kbd><kbd>→</kbd> 可在步骤间切换。
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 用户视角 ================= -->
+<section class="view" id="view-user">
+  <div class="container">
+    <div class="viewhead">
+      <div class="vh-k">USER PERSPECTIVE</div>
+      <h1>用户视角：接入你的 Agent，建你自己的测评集</h1>
+      <p>这一条路走完，你可以：跑通内置演示 → 把任意形态的 Agent（人工 / 脚本 / 命令行 / HTTP 服务）接进来 → 读懂反馈与报告 → 为自己的业务写出高质量任务 → 批量评估与横向对比。</p>
+    </div>
+    <div class="steplayout">
+      <aside class="stepnav" id="nav-user"></aside>
+      <div class="step-panels" id="panels-user">
+<!-- ========== U1 快速跑通 ========== -->
+<div class="spanel" data-title="五分钟跑通第一个评估" data-desc="构建 · 演示 · 看报告">
+  <h2>第 1 步 · 五分钟跑通第一个评估</h2>
+  <p class="pdesc">不需要任何模型或 API Key。框架自带 5 个任务和「脚本回放的 Agent」，先看一遍完整闭环长什么样，再谈接入你自己的 Agent。</p>
+
+  <h3 class="sec">前置条件：Java 17+ 与 Maven，其余什么都不用装</h3>
+  <div class="codeblock"><div class="codehead"><span class="cl">bash</span><button class="copybtn">复制</button></div><pre data-lang="bash"><code># 1. 构建（产物是单个 jar：target/agent-eval-lite-0.1.0-cli.jar）
+mvn -q package
+
+# 2. 看看内置任务库（5 个任务，覆盖 5 类任务形态）
+bin/agent-eval list
+
+# 3. 跑一个内置演示：脚本回放的「Agent」第 1 轮算错金额被打回，第 2 轮按反馈修正后通过
+bin/agent-eval run --task tasks/api-payload-001 --agent scripted \
+    --script tasks/api-payload-001/samples/replay.yaml
+
+# 4. 看报告
+cat runs/api-payload-001/run_*/report/report.md</code></pre></div>
+
+  <h3 class="sec">终端演示（真实输出回放，点右上角播放）</h3>
+  <div class="term" id="term1">
+    <div class="termhead"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="tt">zsh — agent-eval-lite</span><button class="playbtn" data-term="t1">播放 ▶</button></div>
+    <div class="termbody" id="term-t1"><span class="tl-info">点击「播放」重现一次真实评估……</span></div>
+  </div>
+
+  <h3 class="sec">刚才发生了什么？</h3>
+  <ol class="steps">
+    <li>框架把任务的可见材料 <code>work/</code> 复制成本次 run 的私有 <b>workspace</b>，并渲染出一份 <code>instructions.md</code>（任务说明 + 提交契约），交给 Agent。</li>
+    <li>第 1 轮：Agent 提交的 payload 漏了 VIP 折扣 —— 隐藏评审打出 <b>35 分</b>，把「改进方向」写进 <code>feedback/</code>（但绝不透露期望值）。</li>
+    <li>第 2 轮：Agent 按反馈修正后再提交 —— <b>100 分</b>，通过。整个过程的每一步都留痕在 <code>traces/trace.jsonl</code>。</li>
+    <li>终局报告落在 <code>runs/api-payload-001/run_*/report/</code>：分数、维度、轮次轨迹、安全项、可复现指纹一应俱全。</li>
+  </ol>
+  <div class="note"><span class="nt t-info">一键体检</span>想确认整个框架在你机器上是健康的？跑 <code>bash bin/ci-smoke.sh</code> —— CODEMAP 漂移、单元测试、任务集回放、红队回归四道闸一次过，与 CI 完全同口径。</div>
+</div>
+
+<!-- ========== U2 接入 Agent ========== -->
+<div class="spanel" data-title="把你的 Agent 接进来" data-desc="四种方式 + Docker 沙箱">
+  <h2>第 2 步 · 把你的 Agent 接进来</h2>
+  <p class="pdesc">框架不关心 Agent 内部怎么思考，只关心三件事：<b>给它任务说明与反馈、让它在 workspace 里干活、收它写进 inbox 的提交</b>。所以任何形态的 Agent 都能接。</p>
+
+  <h3 class="sec">先选方式：你手上的 Agent 是什么形态？</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>你有什么</th><th>用哪种</th><th>典型场景</th></tr>
+    <tr><td>一个人（或想自己先当一次 Agent）</td><td><code>--agent manual</code></td><td>调试新任务、建立人工基线分</td></tr>
+    <tr><td>预先准备好的提交文件</td><td><code>--agent scripted</code></td><td>CI 回归、任务自测（确定性回放）</td></tr>
+    <tr><td>命令行 Agent（claude / codex / cursor-agent / 自研 CLI）</td><td><code>--agent cli</code></td><td>真实 Agent 评估的主力方式</td></tr>
+    <tr><td>HTTP 服务（chat API / Agent 平台入口 / 自研服务）</td><td><code>--agent http</code></td><td>评估服务形态的 Agent，无需落地成命令行</td></tr>
+  </table></div>
+  <div class="note"><span class="nt t-info">30 秒选型</span>评「人」或调试新任务 → <b>manual</b>；要确定性 CI 回归 → <b>scripted</b>；Agent 是命令行程序 → <b>cli</b>（不可信 / 强对抗再加 <code>--sandbox docker</code>）；Agent 是常驻服务 → <b>http</b>。四种方式可在 <code>agents.yaml</code> 里混搭对比。</div>
+
+  <h3 class="sec">对接全景：每个阶段谁做什么、你要设置什么</h3>
+  <p>对接的全部工作量就是下表第四列——框架把其余环节都包了。三方分工一目了然：</p>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>阶段</th><th>框架做什么</th><th>你的 Agent 要做什么</th><th>你（评估者）要设置什么</th></tr>
+    <tr><td><b>启动前</b></td><td>校验任务 → 复制 work/ 为私有 workspace（记指纹）→ 渲染 instructions.md → 拉起签名留痕与工具网关</td><td>—</td><td>选任务目录 <code>--task</code>；选接入方式 <code>--agent</code>；cli 填 <code>--cmd</code> 模板 / http 填 <code>--endpoint</code>；不可信 Agent 加 <code>--sandbox docker --sandbox-image</code></td></tr>
+    <tr><td><b>每轮开始</b></td><td>把「说明 + 上轮反馈」交给 Agent（cli：占位符/环境变量注入并启动进程；http：POST 任务 JSON）</td><td>读 instructions.md 与 feedback，理解题目与改进方向</td><td>（可选）轮次与预算在 task.yaml：<code>max_attempts</code>、<code>attempt_timeout_minutes</code></td></tr>
+    <tr><td><b>干活中</b></td><td>看住边界：工具白名单网关、超时强杀、全程签名留痕</td><td>在 workspace 里读写干活；要用任务工具时执行 <code>agent-eval tool call</code> 并记下 call_id</td><td>（可选）任务用真实工具时设 <code>AEL_TOOL_MODE=live</code> 录制</td></tr>
+    <tr><td><b>提交</b></td><td>收取 inbox 文件 → 信封+分型双 Schema 校验 → 隐藏判分 → 写受控反馈；未达线且有余量则续轮</td><td><b>把提交 JSON 写进 <code>inbox/attempt_NNN.json</code></b>（唯一必须实现的动作）</td><td>—</td></tr>
+    <tr><td><b>结束后</b></td><td>选最佳轮次 → 生成 report.json/md → 落盘签名密钥供复核</td><td>—</td><td>看报告；接 CI 加 <code>--fail-on-not-passed</code>；要看板则 <code>export</code> 推 OTLP</td></tr>
+  </table></div>
+
+  <h3 class="sec">命令生成器（点选组合，直接复制）</h3>
+  <div class="card">
+    <div class="optbar" id="modeBar">
+      <button class="opt on" data-mode="cli">cli · 命令行 Agent</button>
+      <button class="opt" data-mode="http">http · 服务 Agent</button>
+      <button class="opt" data-mode="manual">manual · 人工</button>
+      <button class="opt" data-mode="scripted">scripted · 回放</button>
+    </div>
+    <div class="switchrow" id="sandboxRow"><label class="switch"><input type="checkbox" id="sandboxToggle"><span class="sl"></span></label><span>启用 <b>Docker 沙箱</b>（评不可信 / 强对抗 Agent 时强烈推荐；仅 cli 模式支持）</span></div>
+    <div class="switchrow" id="netRow" style="display:none"><label class="switch"><input type="checkbox" id="netToggle"><span class="sl"></span></label><span>容器联网 <code>bridge</code>（任务用到工具网关时打开；默认 <code>none</code> 全程断网）</span></div>
+    <div class="codeblock"><div class="codehead"><span class="cl">bash</span><button class="copybtn">复制</button></div><pre data-lang="bash"><code id="cmdOut"></code></pre></div>
+    <p style="font-size:13px;color:var(--muted)" id="cmdNote"></p>
+  </div>
+
+  <h3 class="sec">cli 模式：占位符与环境变量</h3>
+  <p>命令模板里可用 6 个占位符（自动 shell 转义），Agent 进程还会拿到同义的环境变量；进程工作目录固定为 workspace，超时强杀。</p>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>占位符</th><th>环境变量</th><th>含义</th></tr>
+    <tr><td><code>{instructions}</code></td><td><code>AEL_INSTRUCTIONS</code></td><td>任务说明文件 instructions.md 的绝对路径</td></tr>
+    <tr><td><code>{workspace}</code></td><td><code>AEL_WORKSPACE</code></td><td>本次 run 的私有工作区（可自由读写）</td></tr>
+    <tr><td><code>{inbox}</code></td><td><code>AEL_INBOX</code></td><td>提交收件目录（唯一有效提交通道）</td></tr>
+    <tr><td><code>{attempt_id}</code></td><td><code>AEL_ATTEMPT_ID</code></td><td>本轮应使用的提交 id，如 <code>attempt_002</code></td></tr>
+    <tr><td><code>{feedback}</code></td><td><code>AEL_FEEDBACK</code></td><td>上一轮受控反馈文件（首轮为空）</td></tr>
+    <tr><td><code>{run_dir}</code></td><td><code>AEL_RUN_DIR</code></td><td>run 根目录（Docker 沙箱下置空，因含评审禁区）</td></tr>
+  </table></div>
+
+  <h3 class="sec">Agent 侧要做的唯一一件事：把提交 JSON 写进 inbox</h3>
+  <p>无论哪种接入方式，评分只认写进 <code>inbox/attempt_NNN.json</code> 且通过双重 Schema 校验的提交——<b>stdout 里的自然语言不计分</b>。提交是一个「信封 + 分型」结构：</p>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>信封字段（必填）</th><th>类型</th><th>说明</th></tr>
+    <tr><td><code>schema_version</code></td><td>int</td><td>固定 <code>1</code></td></tr>
+    <tr><td><code>task_id</code> / <code>attempt_id</code></td><td>string</td><td>与 run 上下文强校验，对不上判 invalid</td></tr>
+    <tr><td><code>submission_type</code></td><td>enum</td><td><code>generic | code_fix | api_payload | tool_call | document | review</code>，决定追加哪些分型字段</td></tr>
+    <tr><td><code>summary</code></td><td>string</td><td>本次提交做了什么（≥8 字符，防空提交）</td></tr>
+    <tr><td><code>known_risks</code></td><td>string[]</td><td>已知风险边界，可为空数组但必须存在</td></tr>
+    <tr><td><code>needs_human_review</code></td><td>boolean</td><td>true 会挂起等待人工复核</td></tr>
+    <tr><td><code>evidence[]</code>（可选）</td><td>object[]</td><td>证据链 <code>{type, source, quote_or_ref}</code>，document/review 型必填</td></tr>
+    <tr><td><code>tool_calls_used[]</code>（可选）</td><td>object[]</td><td>声明用过的工具调用，<code>call_id</code> 必须能和留痕对上</td></tr>
+    <tr><td><code>usage</code>（可选）</td><td>object</td><td>自报 token/成本，仅做 ROI 参考，不参与评分</td></tr>
+  </table></div>
+  <details class="acc"><summary><span class="lbl">SAMPLE</span>看一份真实的通过提交（api-payload-001）</summary><div class="accbody">
+  <div class="codeblock"><div class="codehead"><span class="cl">json</span><button class="copybtn">复制</button></div><pre data-lang="json"><code>{
+  "schema_version": 1,
+  "task_id": "api-payload-001",
+  "attempt_id": "attempt_002",
+  "submission_type": "api_payload",
+  "summary": "商品小计 5500 分，客户为 VIP 按文档规则打 9 折得 4950 分；加急要求映射为 order_type=EXPRESS",
+  "final_payload": {
+    "order_type": "EXPRESS",
+    "customer": { "customer_id": "C-8801", "level": "VIP" },
+    "items": [
+      { "sku": "SKU-A", "qty": 2, "unit_price_cents": 1250 },
+      { "sku": "SKU-B", "qty": 1, "unit_price_cents": 3000 }
+    ],
+    "total_amount_cents": 4950,
+    "currency": "CNY"
+  },
+  "evidence": [
+    { "type": "file", "source": "work/docs/api.md", "quote_or_ref": "VIP 客户享受 9 折：总额 = 商品小计 × 0.9" },
+    { "type": "file", "source": "work/docs/request.md", "quote_or_ref": "会员等级 VIP；要求加急发货" }
+  ],
+  "known_risks": ["若后续增加优惠券叠加规则，折扣顺序需要确认"],
+  "needs_human_review": false
+}</code></pre></div></div></details>
+
+  <h3 class="sec">http 模式：窄口径契约（推任务、收提交）</h3>
+  <p>框架每轮向你的 <code>--endpoint</code> POST 一个 JSON；你的服务用 <code>200</code> + 提交信封 JSON 应答（响应体就是本轮提交），<code>204</code> 表示放弃后续轮次，其他状态码 / 超时按本轮无提交继续。服务不可达按<b>评估基础设施故障</b>处理，不会误记为 Agent 低分。</p>
+  <div class="codeblock"><div class="codehead"><span class="cl">json · 框架 → 你的服务（每轮 POST）</span><button class="copybtn">复制</button></div><pre data-lang="json"><code>{
+  "protocol": "ael-http-agent/1",
+  "task_id": "api-payload-001",
+  "attempt_id": "attempt_002",
+  "attempt_number": 2,
+  "max_attempts": 3,
+  "instructions": "…instructions.md 全文…",
+  "feedback": { "score": 35.0, "failed_checks": ["…上一轮受控反馈；首轮为 null…"] },
+  "workspace_dir": "/abs/path/runs/…/workspace",
+  "inbox_dir": "/abs/path/runs/…/inbox",
+  "run_dir": "/abs/path/runs/…",
+  "tool_gateway": { "endpoint": "http://127.0.0.1:PORT", "token": "…" }
+}</code></pre></div>
+
+  <h3 class="sec">任务带工具时：经网关调用（留痕、可核验）</h3>
+  <p>任务声明了 <code>allowed_tools</code> 时，Agent 通过 CLI 网关调用工具，拿到应答和一个 <code>call_id</code>。提交里引用的 <code>call_id</code> 必须能和签名留痕对上——<b>编造调用记录会被一票否决</b>。</p>
+  <div class="codeblock"><div class="codehead"><span class="cl">bash</span><button class="copybtn">复制</button></div><pre data-lang="bash"><code># Agent 侧调用（需要环境变量 AEL_RUN_DIR，cli 模式已自动注入）
+bin/agent-eval tool call user.lookup --input '{"user_id":"u_1001"}'
+# → {"call_id":"tc_a1b2…","output":{"level":"GOLD",…}}   应答来自任务 hidden/tools/ 的应答库（Agent 看不到库本身）</code></pre></div>
+  <div class="note warn"><span class="nt t-warn">评不可信 Agent？开沙箱</span><code>--sandbox docker</code> 会把 Agent 命令包进容器，容器里<b>只有</b> workspace、inbox、feedback、instructions 四个挂载点——隐藏答案根本不在容器文件系统里，偷看无从谈起；默认断网。镜像需自带 Agent 运行环境（用工具时还需 JRE）。</div>
+</div>
+
+<!-- ========== U3 读懂反馈与报告 ========== -->
+<div class="spanel" data-title="读懂反馈与报告" data-desc="每轮反馈 · 终局报告 · 退出码">
+  <h2>第 3 步 · 读懂反馈与报告</h2>
+  <p class="pdesc">评估过程中 Agent 收到的是「受控反馈」，评估结束后你拿到的是「完整报告」。两者刻意不同：反馈指方向不给答案，报告全量透明可复现。</p>
+
+  <h3 class="sec">每轮反馈：告诉 Agent 往哪改，绝不透露期望值</h3>
+  <p>下面是演示 run 第 1 轮的真实反馈文件（<code>feedback/attempt_001.feedback.json</code> 节选）。注意它只有「对外文案」，没有任何 expected 值：</p>
+  <div class="codeblock"><div class="codehead"><span class="cl">json</span><button class="copybtn">复制</button></div><pre data-lang="json"><code>{
+  "attempt_id": "attempt_001",
+  "valid": true,
+  "score": 35.0,
+  "max_score": 100,
+  "passed": false,
+  "dimension_scores": { "correctness": 0.0, "format": 20.0, "evidence": 15.0, "explanation": 0.0 },
+  "feedback": "得分 35.0/100，未达通过线 80。改进方向：订单总额不正确，请重读接口文档的金额规则（注意会员折扣与单位）；order_type 与业务请求不符（注意加急要求）…",
+  "failed_checks": [
+    { "dimension": "correctness", "severity": "critical", "message": "订单总额不正确，请重读接口文档的金额规则（注意会员折扣与单位）" },
+    { "dimension": "correctness", "severity": "medium",   "message": "order_type 与业务请求不符（注意加急要求）" }
+  ],
+  "next_step": "请将修正后的提交写入 inbox/attempt_002.json",
+  "next_attempt_id": "attempt_002"
+}</code></pre></div>
+  <p>反馈的粒度由任务作者在 <code>task.yaml</code> 里控制：<code>summary</code>（只给分）/ <code>failed_rules</code>（给失败检查的对外文案，默认推荐）/ <code>full</code>。</p>
+
+  <h3 class="sec">run 目录：产物即档案（点击左侧文件看说明）</h3>
+  <div class="treewrap">
+    <div class="tree" id="runTree">
+      <div class="tnode" data-name="runs/&lt;task-id&gt;/&lt;run-id&gt;/" data-note="每次评估的自包含产物目录。凭这个目录即可离线重建报告、复算分数、断点续跑，不依赖任何外部状态。"><span class="tn">runs/&lt;task-id&gt;/&lt;run-id&gt;/</span></div>
+      <div class="tnode" data-name="instructions.md" data-note="渲染给 Agent 的任务说明：任务陈述、可见材料清单、提交契约（信封字段表）、反馈位置、评分维度。由 task.yaml 渲染而来，绝不包含答案。"><span class="tn">├── instructions.md</span> <span class="badge b-agent tb">Agent 可见</span></div>
+      <div class="tnode" data-name="workspace/" data-note="work/ 的私有副本，Agent 在这里自由读写干活。创建时记录文件级 SHA-256 基线指纹，供 changed_files_verified 核验「说改了的文件真的改了」。"><span class="tn">├── workspace/</span> <span class="badge b-agent tb">Agent 读写</span></div>
+      <div class="tnode" data-name="inbox/" data-note="唯一有效提交通道。Agent 把 attempt_001.json、attempt_002.json… 写进来，框架做信封+分型双重 Schema 校验后送评。"><span class="tn">├── inbox/</span> <span class="badge b-agent tb">Agent 写入</span></div>
+      <div class="tnode" data-name="feedback/" data-note="框架写出的受控反馈（attempt_NNN.feedback.json）。Agent 只读。粒度可配，期望值与 private_notes 永不出现。"><span class="tn">├── feedback/</span> <span class="badge b-agent tb">Agent 只读</span></div>
+      <div class="tnode" data-name="judge/" data-note="完整评分结果（attempt_NNN.judge.json），含 private_notes、规则命中细节、可复现指纹。评审禁区，Agent 不可见。llm_rubric 的原始请求/响应也全量存档在这里。"><span class="tn">├── judge/</span> <span class="badge b-hidden tb">评审禁区</span></div>
+      <div class="tnode" data-name="traces/trace.jsonl" data-note="append-only 全过程留痕，17 类事件（生命周期/工具/提交/评分/反馈/恢复/错误）。每条框架事件用每 run 私密密钥 HMAC 签名，判分只认可核验的事件。"><span class="tn">├── traces/trace.jsonl</span> <span class="badge b-trace tb">签名留痕</span></div>
+      <div class="tnode" data-name="report/" data-note="终局报告 report.json（机器可读）+ report.md（人读）：最终成绩、维度得分、轮次轨迹、工具使用、安全项、可复现指纹。可用 agent-eval report 从工件随时重建（纯读幂等）。"><span class="tn">├── report/report.md · report.json</span> <span class="badge b-frame tb">评估者</span></div>
+      <div class="tnode" data-name="agent-logs/" data-note="Agent 进程的 stdout/stderr 落盘（cli 模式）。canary 泄露探针的扫描范围覆盖这里——把隐藏内容 dump 到 stdout 会被抓到。"><span class="tn">├── agent-logs/</span> <span class="badge b-frame tb">评估者</span></div>
+      <div class="tnode" data-name="meta.json / run_state.json" data-note="run 元数据（agent/model/时间/引擎版本/指纹）与断点续跑快照。每轮原子落盘，进程被杀后 run --resume 可续跑；恢复前校验 hidden 指纹，被篡改则 INTEGRITY_BROKEN 熔断。"><span class="tn">└── meta.json · run_state.json</span> <span class="badge b-frame tb">框架</span></div>
+    </div>
+    <div class="tnotebox" id="runTree-note"><h4>点击左侧条目</h4><p>查看每个产物的作用，以及它属于 Agent 可触碰区还是评审禁区。</p></div>
+  </div>
+
+  <h3 class="sec">终局报告长什么样（真实样例）</h3>
+  <p>最终成绩 <b>100.0 / 100 通过</b>（最佳轮次 attempt_002），轮次轨迹里能看到第 1 轮 35 分和失败检查列表；报告尾部是四个可复现指纹（引擎版本 / 规则版本 / hidden 指纹 / workspace 指纹）——这是「同输入必同分」承诺的凭据：</p>
+  <div class="codeblock"><div class="codehead"><span class="cl">markdown · report.md 节选</span><button class="copybtn">复制</button></div><pre data-lang="bash"><code>## 轮次轨迹
+| 轮次        | 有效 | 得分  | 通过 | 失败检查                                     | 耗时(ms) |
+| attempt_001 | 是   | 35.0  | 否   | TOTAL_AMOUNT, ORDER_TYPE, DISCOUNT_EXPLAINED |  57 |
+| attempt_002 | 是   | 100.0 | 是   | —                                            |   6 |
+
+## 可复现性
+- 引擎：agent-eval-lite/0.1.0     - 规则版本：1.0.0
+- hidden 指纹：3b8ffdb11faa       - workspace 初始指纹：c253cef275f7
+复核方式：agent-eval judge --task &lt;任务目录&gt; --submission inbox/&lt;attempt&gt;.json</code></pre></div>
+
+  <div class="grid g2">
+    <div class="card tight"><h4>怀疑分数不对？离线复算</h4><p><code>bin/agent-eval judge --task tasks/xxx --submission sub.json</code> 可随时对任意历史提交重评——相同输入必得相同分数（用了 <code>llm_rubric</code> 的任务会如实标注 <code>deterministic=false</code>）。</p></div>
+    <div class="card tight"><h4>想看过程细节？导出到看板</h4><p><code>bin/agent-eval export --run runs/xxx/run_yyy</code> 把留痕导出为 OTLP/OpenInference（run→AGENT / attempt→CHAIN / tool_call→TOOL 三层 span），Phoenix / Langfuse / OTel Collector 可直接摄取。</p></div>
+  </div>
+
+  <h3 class="sec">退出码：接 CI 就靠它</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>退出码</th><th>含义</th></tr>
+    <tr><td><code>0</code></td><td>评估正常完成（<b>无论通过与否</b>——verdict 看报告）</td></tr>
+    <tr><td><code>1</code></td><td>参数 / 输入错误（含 Docker 未就绪的前移拦截，不会误记为 Agent 低分）</td></tr>
+    <tr><td><code>2</code></td><td>框架故障或完整性熔断（INTEGRITY_BROKEN）</td></tr>
+    <tr><td><code>3</code></td><td>配了 <code>--fail-on-not-passed</code> 且未通过（CI 门禁专用）</td></tr>
+  </table></div>
+</div>
+
+<!-- ========== U4 构建高质量测评集 ========== -->
+<div class="spanel" data-title="构建高质量测评集" data-desc="建题五步法 · 15 种 check · 评分沙盘">
+  <h2>第 4 步 · 构建高质量测评集</h2>
+  <p class="pdesc">一个任务 = 一道「有隐藏标准答案的题」。核心纪律只有一条：<b>Agent 能看到的（task.yaml、work/）绝不含答案；答案与规则全在 hidden/</b>。跟着五步法走，脚手架保证你从「已经能跑」的起点开始。</p>
+
+  <h3 class="sec">建题五步法</h3>
+  <ol class="steps">
+    <li><b>生成脚手架</b>：<code>bin/agent-eval task init --id my-task-001</code> —— 产物是一个开箱即过 validate、自带 fail→pass 回放闭环的最小任务，<b>从它开始改，不要从空目录开始猜</b>。</li>
+    <li><b>写题面</b>：改 <code>task.yaml</code>（<code>task_id</code> 必须等于目录名；维度权重之和必须等于满分），把任务材料放进 <code>work/</code>。</li>
+    <li><b>写评审</b>：改 <code>hidden/judge.rules.yaml</code>（15 种 check 见下方浏览器）；期望值放 <code>hidden/expected/</code>，用 <code>expected_from: "expected/x.json#/指针"</code> 引用——<b>不要写进任何对外文案</b>。</li>
+    <li><b>过体检</b>：<code>bin/agent-eval validate --task tasks/my-task-001</code> —— 深度 lint 把「run 时才会炸」的配置错误前移拦截（expected_from 断链、schema_file 缺失、check 要求调用白名单外工具…）。</li>
+    <li><b>钉住闭环</b>：更新 <code>samples/attempt-pass.json</code> / <code>attempt-fail.json</code> + <code>replay.yaml</code>，用 scripted 跑通「第 1 轮失败 → 按反馈修正 → 第 2 轮通过」，这个闭环以后就是这道题的 CI 回归。</li>
+  </ol>
+
+  <h3 class="sec">任务目录契约（点击条目看说明）</h3>
+  <div class="treewrap">
+    <div class="tree" id="taskTree">
+      <div class="tnode" data-name="tasks/&lt;task-id&gt;/" data-note="任务即目录，kebab-case 加数字后缀（如 code-fix-001）。整个目录就是一道题的全部定义，可整体版本化、评审、复用。"><span class="tn">tasks/&lt;task-id&gt;/</span></div>
+      <div class="tnode" data-name="task.yaml" data-note="任务规格：题面（agent_brief）、可见材料清单（visible_context）、工具白名单（allowed_tools）、提交契约（submit）、评审配置（judge）、评分维度（scoring）、运行预算（runtime）。Agent 可读，所以绝不放答案。"><span class="tn">├── task.yaml</span> <span class="badge b-agent tb">Agent 可见</span></div>
+      <div class="tnode" data-name="work/" data-note="Agent 可见的任务材料（文档/代码/数据）。run 时被复制成私有 workspace，原目录永不被改动。只放合成/脱敏数据。"><span class="tn">├── work/</span> <span class="badge b-agent tb">Agent 可见</span></div>
+      <div class="tnode" data-name="hidden/judge.rules.yaml" data-note="隐藏评审规则：checks 列表（15 种类型）、canary 泄露探针 token、每个 check 的维度/分值/blocking/对外反馈文案。Agent 永不可见。"><span class="tn">├── hidden/judge.rules.yaml</span> <span class="badge b-hidden tb">评审私有</span></div>
+      <div class="tnode" data-name="hidden/expected/" data-note="期望数据（标准答案、JSON Schema 等），由规则用 expected_from / schema_file 引用。判分时比对，反馈里永不回显。"><span class="tn">├── hidden/expected/</span> <span class="badge b-hidden tb">评审私有</span></div>
+      <div class="tnode" data-name="hidden/tools/" data-note="mock 工具应答库（<name>.responses.yaml）：按输入匹配返回应答。Agent 经网关拿到应答但看不到库本身。需要真实系统时可在 task.yaml 声明 http 后端，live 录制后晋升为回放库。"><span class="tn">├── hidden/tools/</span> <span class="badge b-hidden tb">评审私有</span></div>
+      <div class="tnode" data-name="samples/" data-note="attempt-pass.json / attempt-fail.json 两份示例提交 + replay.yaml 回放脚本。作用：任务自测 + CI 回归（suite 批跑用 scripted 回放全部任务的 fail→pass 闭环）。"><span class="tn">└── samples/</span> <span class="badge b-frame tb">任务自测</span></div>
+    </div>
+    <div class="tnotebox" id="taskTree-note"><h4>点击左侧条目</h4><p>看每个文件/目录在「出题」里扮演的角色。红色标记 = Agent 永不可见。</p></div>
+  </div>
+
+  <h3 class="sec">每个文件：写什么、解决什么问题</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>文件 / 目录</th><th>你要写什么</th><th>它解决什么问题</th></tr>
+    <tr><td><code>task.yaml</code> <span class="badge b-agent">Agent 可见</span></td><td>题面（agent_brief）、可见材料清单、工具白名单、提交契约（类型/轮次/冷却）、评分维度与通过线、运行预算、tier 分层</td><td>定义「题目与考试规则」，让任意 Agent 拿到同一份无歧义的考卷；<b>因为 Agent 可读，绝不放答案</b></td></tr>
+    <tr><td><code>work/</code> <span class="badge b-agent">Agent 可见</span></td><td>任务材料：文档、代码、数据（一律合成 / 脱敏）</td><td>给 Agent 的作业环境；run 时复制成私有 workspace，原件永不被改、多次评估互不污染</td></tr>
+    <tr><td><code>hidden/judge.rules.yaml</code> <span class="badge b-hidden">评审私有</span></td><td>checks 清单（类型/维度/分值/blocking）、canary 探针、对外反馈文案</td><td>客观判分标准与「指方向不给答案」的反馈；藏在评审区使评分标准无法被摸透刷分</td></tr>
+    <tr><td><code>hidden/expected/</code> <span class="badge b-hidden">评审私有</span></td><td>标准答案 JSON、校验 Schema 等期望数据</td><td>期望值与规则解耦（<code>expected_from</code> 指针引用），可复用可审计，且永不出现在对外文案里</td></tr>
+    <tr><td><code>hidden/tools/*.responses.yaml</code> <span class="badge b-hidden">评审私有</span></td><td>mock 工具应答库（按输入匹配返回）；连真实系统则在 task.yaml 声明 http 后端后用 live 模式录制生成</td><td>工具调用确定性可回放：Agent 拿到应答但看不到库，CI 零外呼</td></tr>
+    <tr><td><code>samples/attempt-pass / fail.json</code></td><td>一份能通过、一份会挂掉的示例提交</td><td>证明题目可解、判分能区分好坏——题目质量的最低物证</td></tr>
+    <tr><td><code>samples/replay.yaml</code></td><td>回放剧本：逐轮提交哪个文件、模拟哪些改动/工具调用</td><td>把「失败 → 按反馈修正 → 通过」闭环变成无模型依赖的 CI 回归资产</td></tr>
+  </table></div>
+
+  <h3 class="sec">task.yaml 逐字段注解（可直接当模板抄）</h3>
+  <div class="codeblock"><div class="codehead"><span class="cl">yaml · task.yaml（基于内置任务 api-payload-001）</span><button class="copybtn">复制</button></div><pre data-lang="yaml"><code>schema_version: 1
+task_id: api-payload-001        # 必须等于目录名（validate 强校验）
+task_name: 按接口文档生成创建订单 payload
+task_type: api_payload          # code_fix | api_payload | document | tool_call | review | custom
+tier: smoke                     # 可选分层：smoke/regression/security/domain（suite --tier 按层批跑）
+description: >                  # 给评估者看的背景（不渲染给 Agent）
+  评估 Agent 的接口文档理解与结构化产出能力……
+
+agent_brief: |                  # 渲染进 instructions.md 的题面（Agent 视角，禁止出现答案）
+  你需要为一笔客户订单生成「创建订单」接口的请求 payload……
+
+visible_context:                # 向 Agent 声明的可读材料清单（work/ 内白名单）
+  - work/docs/api.md
+  - work/docs/request.md
+
+allowed_tools: []               # 空 = 不经框架工具网关；需要工具时列 {name, description, backend?}
+
+submit:
+  format: json
+  schema: builtin:api_payload   # builtin:<type> 用内置分型 schema；或指向 hidden/ 下自定义 schema
+  max_attempts: 3               # 轮次上限：防无限刷
+  cooldown_seconds: 0           # 两次提交最小间隔：防把反馈当 oracle 穷举
+
+judge:
+  type: rules                   # rules | script | hybrid
+  rules_file: hidden/judge.rules.yaml
+  feedback:
+    level: failed_rules         # summary 只给分 | failed_rules 给失败文案 | full
+    include_scores: true
+
+scoring:
+  max_score: 100
+  pass_score: 80                # 通过线
+  selection: best_score         # 最终成绩取哪轮：best_score | first_pass | last
+  dimensions:                   # 权重之和必须 = max_score（validate 强校验）
+    - name: correctness
+      weight: 50
+    - name: format
+      weight: 20
+    - name: evidence
+      weight: 15
+    - name: explanation
+      weight: 15
+
+runtime:
+  timeout_minutes: 20           # 整个 run 的墙钟预算
+  attempt_timeout_minutes: 5    # 单轮 Agent 执行预算（超时强杀）
+  allow_multi_submit: true
+  auto_eval_interval_seconds: 0 # >0 时后台快照采样得分轨迹（长跑任务的过程观测）
+  resume_enabled: true</code></pre></div>
+
+  <h3 class="sec">隐藏评审规则实例（api-payload-001 真实规则）</h3>
+  <div class="codeblock"><div class="codehead"><span class="cl">yaml · hidden/judge.rules.yaml</span><button class="copybtn">复制</button></div><pre data-lang="yaml"><code>schema_version: 1
+judge_version: "1.0.0"            # 规则语义版本，进入报告的可复现指纹
+
+checks:
+  - id: PAYLOAD_SCHEMA            # 结构不对，一票否决
+    type: json_schema
+    dimension: format
+    points: 20
+    blocking: true
+    target: "$.final_payload"
+    schema_file: expected/order.schema.json
+    feedback_fail: final_payload 结构不符合接口文档（字段/类型/枚举检查未通过）
+
+  - id: TOTAL_AMOUNT              # 期望值放 hidden/expected/，用指针引用，绝不出现在文案里
+    type: jsonpath_equals
+    dimension: correctness
+    points: 30
+    path: "$.final_payload.total_amount_cents"
+    expected_from: "expected/answer.json#/total_amount_cents"
+    feedback_fail: 订单总额不正确，请重读接口文档的金额规则（注意会员折扣与单位）
+
+  - id: EVIDENCE_VALID            # 证据必须指向任务可见材料
+    type: evidence_sources_valid
+    dimension: evidence
+    points: 15
+
+  - id: DISCOUNT_EXPLAINED        # 关键点覆盖率：解释里得提到折扣口径
+    type: list_coverage
+    dimension: explanation
+    points: 15
+    path: "$.summary"
+    min_matches: 1
+    expected_any_of:
+      - ["折", "discount", "0.9", "9折", "90%"]</code></pre></div>
+
+  <h3 class="sec">先看全景：15 种 check 一张表</h3>
+  <p>六类武器库对应六类「要防的事」。点击任意类型名，直接在下方浏览器里打开它的 YAML 示例。</p>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>类别</th><th>check 类型（点击看示例）</th><th>断言什么</th></tr>
+    <tr><td rowspan="4"><b>提交结构</b><br><span class="dim">答卷本身对不对</span></td><td><span class="cklink" data-check="json_schema">json_schema</span></td><td>提交任意节点符合 JSON Schema（常配 blocking）</td></tr>
+    <tr><td><span class="cklink" data-check="jsonpath_equals">jsonpath_equals</span></td><td>字段等于期望值（支持数值容差）</td></tr>
+    <tr><td><span class="cklink" data-check="jsonpath_exists">jsonpath_exists</span></td><td>字段必须存在</td></tr>
+    <tr><td><span class="cklink" data-check="jsonpath_matches">jsonpath_matches</span></td><td>字段匹配正则（编号/日期等格式约束）</td></tr>
+    <tr><td rowspan="2"><b>覆盖率与证据</b><br><span class="dim">内容全不全、出处真不真</span></td><td><span class="cklink" data-check="list_coverage">list_coverage</span></td><td>关键点组覆盖率，按命中比例给部分分</td></tr>
+    <tr><td><span class="cklink" data-check="evidence_sources_valid">evidence_sources_valid</span></td><td>引用出处必须指向任务可见材料（防编造）</td></tr>
+    <tr><td rowspan="3"><b>工作区</b><br><span class="dim">产物与改动是否属实</span></td><td><span class="cklink" data-check="workspace_file_exists">workspace_file_exists</span></td><td>工作区存在指定产物文件</td></tr>
+    <tr><td><span class="cklink" data-check="workspace_file_contains">workspace_file_contains</span></td><td>产物文件包含指定内容（正则）</td></tr>
+    <tr><td><span class="cklink" data-check="changed_files_verified">changed_files_verified</span></td><td>申报的文件改动与基线指纹一致（防谎报）</td></tr>
+    <tr><td rowspan="4"><b>执行与过程</b><br><span class="dim">真跑过、真调过、终态真对</span></td><td><span class="cklink" data-check="command">command</span></td><td>在 workspace 临时副本执行命令/隐藏测试（nonce 防短路）</td></tr>
+    <tr><td><span class="cklink" data-check="tool_call_required">tool_call_required</span></td><td>必须真实调用过某工具（只认签名可核验留痕）</td></tr>
+    <tr><td><span class="cklink" data-check="tool_call_forbidden">tool_call_forbidden</span></td><td>禁止调用某工具（负面纪律）</td></tr>
+    <tr><td><span class="cklink" data-check="world_state">world_state</span></td><td>可信写调用折叠为终态，与隐藏期望比对（防「说到没做到」）</td></tr>
+    <tr><td><b>安全</b><br><span class="dim">评审资产没被偷</span></td><td><span class="cklink" data-check="no_canary_leak">no_canary_leak</span></td><td>canary 探针未出现在提交/工作区/日志/留痕</td></tr>
+    <tr><td><b>主观（LLM）</b><br><span class="dim">唯一非确定性</span></td><td><span class="cklink" data-check="llm_rubric">llm_rubric</span></td><td>判分模型按 rubric 打分（权重 ≤30%、禁 blocking、全量存档）</td></tr>
+  </table></div>
+
+  <h3 class="sec">15 种判分 check 浏览器（按用途筛选，点卡片看示例）</h3>
+  <div class="chips" id="checkChips"></div>
+  <div class="checkgrid" id="checkGrid"></div>
+  <div class="checkdetail" id="checkDetail"><h4>点击上方任意 check</h4><p>查看它断言什么、什么时候用、以及一段可直接抄的 YAML 配置。</p></div>
+
+  <h3 class="sec">评分沙盘：亲手感受计分模型</h3>
+  <p>计分规则：<b>维度得分 = 权重 × (维度内拿到的分 / 维度内总分)</b>，总分为各维度之和；<b>通过 = 总分 ≥ 通过线 且 无 blocking 失败</b>。下面装载的是 api-payload-001 的真实规则（通过线 80），切开关看分数怎么变——试试只关掉 <code>PAYLOAD_SCHEMA</code>：总分够线，照样不通过。</p>
+  <div class="calc" id="scoreCalc">
+    <div class="chead">切换每个 check 的通过状态 · 通过线 80/100</div>
+    <div id="calcRows"></div>
+    <div class="calcout">
+      <div id="calcBars"></div>
+      <div class="verdict pass" id="calcVerdict"></div>
+    </div>
+  </div>
+
+  <h3 class="sec">高质量任务清单（建题时逐条自检）</h3>
+  <div class="grid g2">
+    <div class="card tight"><h4>1 · 答案只在 hidden</h4><p>期望值经 <code>expected_from</code> 指针引用；<code>feedback_fail</code> 对外文案指方向不给值（「金额不正确，注意折扣与单位」而不是「应为 4950」）。</p></div>
+    <div class="card tight"><h4>2 · 红线用 blocking</h4><p>结构非法、必须调的工具没调、canary 泄露——这类「过了也不算过」的检查标 <code>blocking: true</code>，一票否决。</p></div>
+    <div class="card tight"><h4>3 · 主观题用部分得分</h4><p>文档/评审类任务用 <code>list_coverage</code> 的关键点组覆盖率拿部分分，别做成全对全错；真正主观的表达质量交给低权重 <code>llm_rubric</code>（≤30%、禁 blocking）。</p></div>
+    <div class="card tight"><h4>4 · 埋 canary 探针</h4><p>在 hidden 里放 <code>canary_token</code>，配 <code>no_canary_leak</code> check——Agent 把隐藏内容抄进提交/工作区/日志/工具入参都会被抓。</p></div>
+    <div class="card tight"><h4>5 · 过程造假防得住</h4><p>声称调了工具？用 <code>tool_call_required + require_referenced</code> 核验签名留痕。声称改了文件？用 <code>changed_files_verified</code> 对基线指纹。「过程对终态错」？上 <code>world_state</code> 终态比对。</p></div>
+    <div class="card tight"><h4>6 · fail→pass 闭环入库</h4><p>samples 必须有一份挂掉的提交和一份通过的提交，replay.yaml 编排「失败→按反馈修正→通过」。这既验证题目可解，也验证反馈有引导力。</p></div>
+    <div class="card tight"><h4>7 · validate 是底线不是终点</h4><p>结构、引用、权重和、深度 lint 全过只说明「能跑」；题目质量还要靠 scripted 回放 + 真人 manual 各打一遍基线。</p></div>
+    <div class="card tight"><h4>8 · 防刷分</h4><p>反馈粒度按需收紧（<code>summary</code> 最严），<code>cooldown_seconds</code> 限制提交频率，<code>max_attempts</code> 卡轮次——防止把反馈当 oracle 穷举。</p></div>
+  </div>
+
+  <h3 class="sec">多轮闭环怎么编排（tool-call-001 的三轮回放）</h3>
+  <div class="codeblock"><div class="codehead"><span class="cl">yaml · samples/replay.yaml</span><button class="copybtn">复制</button></div><pre data-lang="yaml"><code># 第 1 轮：不调工具、编造 call_id → tool_call_required 识破（blocking 判负）
+# 第 2 轮：过程对、终态错——真实查询且提交结论正确，但实际把卡开成 STANDARD → world_state 终态比对拦下
+# 第 3 轮：查询 + 正确开卡 → 通过
+attempts:
+  - submission_file: samples/attempt-fail.json
+  - tool_calls:
+      - tool: user.lookup
+        input: { user_id: "u_1001" }
+      - tool: card.create
+        input: { user_id: "u_1001", card_type: "STANDARD" }
+    submission_file: samples/attempt-fail-endstate.json
+  - tool_calls:
+      - tool: user.lookup
+        input: { user_id: "u_1001" }
+      - tool: card.create
+        input: { user_id: "u_1001", card_type: "PLATINUM" }
+    submission_file: samples/attempt-pass.json</code></pre></div>
+  <p style="font-size:13.5px;color:var(--muted)">replay.yaml 还支持 <code>apply_files</code>（模拟 Agent 修改工作区）与提交模板占位符 <code>{attempt_id}</code> / <code>{tool_call_N}</code>——回放提交能通过 call_id 真伪核验，所以整个闭环可以作为无模型依赖的 CI 回归。</p>
+</div>
+
+<!-- ========== U5 批量评估 ========== -->
+<div class="spanel" data-title="批量评估与持续使用" data-desc="suite · pass^k · 多 Agent 对比 · CI">
+  <h2>第 5 步 · 批量评估、可靠性口径与多 Agent 对比</h2>
+  <p class="pdesc">单个 run 回答「这次做对了吗」；<code>suite</code> 回答「这个 Agent 在我的全部任务上稳定吗、比别的 Agent 强吗」。</p>
+
+  <h3 class="sec">suite 的三种用法</h3>
+  <div class="codeblock"><div class="codehead"><span class="cl">bash</span><button class="copybtn">复制</button></div><pre data-lang="bash"><code># 1. CI 冒烟门禁（默认 scripted）：批跑全部任务的确定性回放，验证框架闭环未劣化
+bin/agent-eval suite --tasks-root tasks --fail-on-not-passed
+
+# 2. 真实 Agent 度量：批量过全部任务，--repeat 3 按 pass^3 口径判可靠性
+bin/agent-eval suite --agent cli --cmd 'claude -p "$(cat {instructions})" --dangerously-skip-permissions' \
+    --label my-agent --repeat 3
+
+# 3. 多 Agent 并列对比：任务 × Agent 矩阵 + 按稳定通过数排序的排名面板
+bin/agent-eval suite --agents-file agents.yaml --repeat 2
+
+# 按分层批跑子集（任务 task.yaml 里的 tier: smoke/regression/security/domain）
+bin/agent-eval suite --tier smoke --fail-on-not-passed
+
+# 跨 run 趋势：汇总历次 report.json → 任务×Agent 的通过率/分数趋势（只读离线）
+bin/agent-eval history --runs-root runs</code></pre></div>
+
+  <div class="codeblock"><div class="codehead"><span class="cl">yaml · agents.yaml（scripted / cli / http 可混搭）</span><button class="copybtn">复制</button></div><pre data-lang="yaml"><code>agents:
+  - label: baseline-scripted
+    type: scripted                 # 用各任务 samples/replay.yaml 回放，作为基线
+  - label: my-agent
+    type: cli
+    cmd: 'claude -p "$(cat {instructions})" --dangerously-skip-permissions'
+  - label: my-service
+    type: http                     # 服务型 Agent（窄口径 HTTP 契约）
+    endpoint: http://localhost:8080/agent
+    headers:
+      - 'Authorization: Bearer xxx'</code></pre></div>
+
+  <h3 class="sec">pass^k：抓出「首跑过、复跑挂」的不稳定 Agent</h3>
+  <p>借鉴 tau-bench：同一任务跑 k 次，<b>k 次全过才算稳定通过</b>。拖动滑块感受口径变化：</p>
+  <div class="card">
+    <div class="pkwrap"><b>k =</b> <input type="range" id="pkSlider" min="1" max="5" value="1"> <span class="pill p-mid" id="pkLabel">pass^1</span></div>
+    <div class="pkagents">
+      <div class="pkagent"><div class="pk-n">agent-A（稳定）</div><div class="pkruns" id="pkA"></div><div id="pkAv"></div></div>
+      <div class="pkagent"><div class="pk-n">agent-B（首跑过、复跑挂）</div><div class="pkruns" id="pkB"></div><div id="pkBv"></div></div>
+    </div>
+    <p style="font-size:13px;color:var(--muted)">k=1 时两个 Agent 都「通过」；k≥2 时 agent-B 现形。报告（suite_report.md）里每个任务一行，稳定通过数决定排名。</p>
+  </div>
+
+  <h3 class="sec">成本与时延也在报告里</h3>
+  <ul class="plain">
+    <li>每个 run 记录真实墙钟时延，套件报告聚合平均耗时。</li>
+    <li>Agent 在提交信封里自报 <code>usage</code>（model / token / cost）时，单 run 与对比面板会聚合出成本列——<b>自报数据只做 ROI 参考，不参与评分</b>，且以签名留痕事件记录。</li>
+  </ul>
+
+  <h3 class="sec">接进 CI：四道闸模板</h3>
+  <p>仓库自带 <code>.github/workflows/ci.yml</code> 与 <code>bin/ci-smoke.sh</code>，本地/CI 同口径：</p>
+  <ol class="steps">
+    <li><code>bin/gen-codemap.sh --check</code> —— CODEMAP 漂移门禁：代码地图与源码不一致即失败（毫秒级）。</li>
+    <li><code>mvn clean verify</code> —— 159 项测试 + Checkstyle + JaCoCo 覆盖率下限 0.75。</li>
+    <li><code>suite --fail-on-not-passed</code> —— 任一任务的 fail→pass 回放闭环被破坏即退出码 3。</li>
+    <li><code>redteam/run_all.sh</code> —— 红队演练 fail-closed（Docker 就绪 19 项全 DEFENDED）：防线退化、观测偏离、报告缺失任一发生即失败。</li>
+  </ol>
+  <div class="note"><span class="nt t-info">连接真实系统</span>工具默认走应答库回放（CI 永远确定性）。要连真实 API：在 task.yaml 给工具声明 http 后端（URL 静态白名单、凭证经 <code>${ENV:*}</code> 从框架环境解析），用 <code>AEL_TOOL_MODE=live</code> 跑一次，框架把每次交换按应答库同格式存档到 <code>&lt;run&gt;/tools/</code>——复制进任务 <code>hidden/tools/</code> 即完成「录制 → 回放」晋升。</div>
+</div>
+
+<!-- ========== U6 速查手册 ========== -->
+<div class="spanel" data-title="速查手册" data-desc="FAQ · 命令表 · 常见坑 · 名词表">
+  <h2>第 6 步 · 速查手册：FAQ、命令、常见坑与术语</h2>
+  <p class="pdesc">日常使用中最常翻的四样东西，集中放在这里。建议收藏本步的链接（地址栏 <code>#user/6</code>）。</p>
+
+  <h3 class="sec">常见问题 FAQ</h3>
+  <details class="acc"><summary><span class="lbl">Q1</span>bin/agent-eval 报「未找到 CLI jar」？</summary><div class="accbody"><p>先 <code>mvn -q package</code>。<code>bin/agent-eval</code> 只是一个定位 <code>target/agent-eval-lite-*-cli.jar</code> 的薄包装脚本，构建一次之后任意目录都能调。</p></div></details>
+  <details class="acc"><summary><span class="lbl">Q2</span>我的 Agent 某轮没写提交，会被判低分吗？</summary><div class="accbody"><p>不会「误判」。该轮记为无提交，run 按剩余轮次/时间继续或结束，报告如实呈现。两类环境问题会被<b>前移拦截而不是记 Agent 低分</b>：http 服务不可达按评估基础设施故障处理；Docker 未安装/未启动直接退出码 1。</p></div></details>
+  <details class="acc"><summary><span class="lbl">Q3</span>怎么调试「为什么这条 check 挂了」？</summary><div class="accbody"><p>三步：① 看 <code>runs/&lt;…&gt;/judge/attempt_NNN.judge.json</code>——完整判分含每条 check 的 earned/possible 与 private_notes；② 用 <code>agent-eval judge --task … --submission …</code> 离线复算，改规则后立刻验证；③ 建题阶段先跑 <code>validate</code>，深度 lint 能把断链/缺文件/越白名单等配置错误提前拦下。</p></div></details>
+  <details class="acc"><summary><span class="lbl">Q4</span>反馈会不会把答案泄露给 Agent？</summary><div class="accbody"><p>机制上不会：反馈只含分数与失败检查的<b>对外文案</b>（feedback_fail），expected 值与 private_notes 永不回传。要更严可把 <code>feedback.level</code> 调成 <code>summary</code>（只给分），并用 <code>cooldown_seconds</code> 限制提交频率防穷举。注意：对外文案是任务作者写的，自检别把答案写进去。</p></div></details>
+  <details class="acc"><summary><span class="lbl">Q5</span>多次评估分数会不一样吗？</summary><div class="accbody"><p>判分侧：14 种确定性 check 同输入必同分（这是可复现承诺，有指纹背书）；唯一例外 <code>llm_rubric</code> 会如实标注 <code>deterministic=false</code> 且权重被限制在 30% 以内。Agent 侧：模型本身有随机性，所以用 <code>suite --repeat k</code> 的 pass^k 口径度量稳定性。</p></div></details>
+  <details class="acc"><summary><span class="lbl">Q6</span>评不可信 / 强对抗 Agent 要注意什么？</summary><div class="accbody"><p>务必 <code>--sandbox docker</code>：容器只挂 workspace/inbox/feedback/instructions，hidden 不在容器文件系统里，默认断网。镜像自备 Agent 运行环境（用工具还需 JRE）。非容器模式有两条如实登记的残余风险（外科式偷看、nonce 重放），只适合受控 / 半可信场景。</p></div></details>
+  <details class="acc"><summary><span class="lbl">Q7</span>任务想连真实系统（真实 API）怎么办？</summary><div class="accbody"><p>在 task.yaml 给工具声明 <code>backend: {type: http, url: …}</code>（URL 静态白名单，凭证 <code>${ENV:KEY}</code> 只在框架进程解析），跑一次 <code>AEL_TOOL_MODE=live</code> 录制真实应答，把 <code>&lt;run&gt;/tools/*.recorded.yaml</code> 拷进任务 <code>hidden/tools/</code>——之后 CI 全部走确定性回放。Agent 改不了外呼目标（入参只作请求负载）。</p></div></details>
+  <details class="acc"><summary><span class="lbl">Q8</span>跑了很多次，怎么看趋势和横向对比？</summary><div class="accbody"><p>单次看 <code>report.md</code>；批量看 <code>suite</code> 的任务×Agent 矩阵与排名面板；历史趋势用 <code>agent-eval history</code>（只读聚合 runs/ 下历次 report.json，产出通过率与分数趋势）；要图形化看板则 <code>export</code> 推 OTLP 到 Phoenix / Langfuse。</p></div></details>
+
+  <h3 class="sec">命令速查表（10 个子命令）</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>命令</th><th>干什么</th><th>最常用形态</th></tr>
+    <tr><td><code>list</code></td><td>列出任务库</td><td><code>bin/agent-eval list</code></td></tr>
+    <tr><td><code>validate</code></td><td>任务静态体检 + 深度 lint</td><td><code>validate --task tasks/xxx</code></td></tr>
+    <tr><td><code>task init</code></td><td>生成开箱即跑的任务脚手架</td><td><code>task init --id my-task-001</code></td></tr>
+    <tr><td><code>run</code></td><td>单任务单 Agent 评估（支持 --resume 续跑）</td><td><code>run --task tasks/xxx --agent cli --cmd '…'</code></td></tr>
+    <tr><td><code>suite</code></td><td>任务集批跑 / pass^k / 多 Agent 对比 / 分层</td><td><code>suite --tier smoke --fail-on-not-passed</code></td></tr>
+    <tr><td><code>judge</code></td><td>离线复算任意提交的分数</td><td><code>judge --task tasks/xxx --submission sub.json</code></td></tr>
+    <tr><td><code>report</code></td><td>从工件重建报告（纯读幂等）</td><td><code>report --run runs/xxx/run_yyy</code></td></tr>
+    <tr><td><code>history</code></td><td>跨 run/Agent/版本趋势聚合（只读离线）</td><td><code>history --runs-root runs</code></td></tr>
+    <tr><td><code>export</code></td><td>trace 导出 OTLP/OpenInference</td><td><code>export --run runs/xxx/run_yyy --endpoint http://…:4318</code></td></tr>
+    <tr><td><code>tool call</code></td><td>Agent 侧经网关调用任务工具</td><td><code>tool call user.lookup --input '{…}'</code></td></tr>
+  </table></div>
+
+  <h3 class="sec">常见坑清单（踩过一次就记住了）</h3>
+  <div class="grid g2">
+    <div class="card tight"><h4>建题时</h4><ul class="plain">
+      <li><code>task_id</code> ≠ 目录名 → validate 直接拒</li>
+      <li>维度权重之和 ≠ <code>max_score</code> → 加载 fail-fast</li>
+      <li>把期望值写进 <code>feedback_fail</code> 文案或 work/ → 泄题（lint 管不了文案，靠自检与 canary）</li>
+      <li>llm 检查权重 &gt;30% 或设 blocking → deep lint 拒</li>
+      <li>录制的应答库忘拷进 <code>hidden/tools/</code> → replay 模式该工具调用 fail-closed 失败</li>
+    </ul></div>
+    <div class="card tight"><h4>接入 / 运行时</h4><ul class="plain">
+      <li>提交文件名必须 <code>attempt_NNN.json</code> 且与信封 <code>attempt_id</code> 一致，对不上判 invalid</li>
+      <li>信封 <code>summary</code> 太短（&lt;8 字符）→ Schema 校验失败</li>
+      <li><code>tool_calls_used[].call_id</code> 编造 → 留痕核验一票否决</li>
+      <li>Docker 沙箱镜像没带 Agent 运行环境 / JRE → 容器内起不来（退出码前移报错）</li>
+      <li>run 进行中手改 hidden/ → INTEGRITY_BROKEN 熔断（退出码 2）</li>
+    </ul></div>
+  </div>
+
+  <h3 class="sec">名词表</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>术语</th><th>一句话解释</th></tr>
+    <tr><td><b>run / attempt</b></td><td>一次完整评估 / 评估中的一轮「提交-判分-反馈」；run 含多个 attempt</td></tr>
+    <tr><td><b>workspace / inbox / feedback</b></td><td>Agent 的三个触点：干活区（work/ 的私有副本）、唯一提交通道、受控反馈目录</td></tr>
+    <tr><td><b>hidden</b></td><td>任务的评审私有区：判分规则、期望答案、工具应答库；Agent 永不可见</td></tr>
+    <tr><td><b>check / dimension / blocking</b></td><td>一条判分断言 / 它计入的评分维度 / 「失败即整体不通过」的一票否决标记</td></tr>
+    <tr><td><b>pass_score / selection</b></td><td>通过线 / 最终成绩取哪一轮（best_score · first_pass · last）</td></tr>
+    <tr><td><b>信封 / 分型</b></td><td>提交 JSON 的两层结构：通用必填字段 + 按 submission_type 追加的专属字段</td></tr>
+    <tr><td><b>canary</b></td><td>埋在 hidden 里的探针 token；出现在提交/工作区/日志/留痕即证明越界读取</td></tr>
+    <tr><td><b>trace / _sig</b></td><td>append-only 全过程留痕 / 每条事件的 HMAC 签名（判分只认可核验事件）</td></tr>
+    <tr><td><b>stop-hook / resume</b></td><td>Agent 自称完成但未达线时的自动续轮 / 进程被杀后从快照断点续跑</td></tr>
+    <tr><td><b>replay / live</b></td><td>工具两种模式：应答库确定性回放（默认）/ 真实外呼并录制存档</td></tr>
+    <tr><td><b>pass^k / tier</b></td><td>同任务跑 k 次全过才算稳定通过的可靠性口径 / 任务分层标签（smoke·regression·security·domain）</td></tr>
+    <tr><td><b>指纹（fingerprint）</b></td><td>hidden/提交/workspace/引擎版本的 SHA-256 摘要，可复现评分的凭据</td></tr>
+  </table></div>
+</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 产品视角 ================= -->
+<section class="view" id="view-product">
+  <div class="container">
+    <div class="viewhead">
+      <div class="vh-k">PRODUCT PERSPECTIVE</div>
+      <h1>产品视角：定位、机制与信任边界</h1>
+      <p>用最直白的话回答四个问题：它是什么、怎么接入、内部怎么运转、凭什么可信。最后给出现状与路线图。</p>
+    </div>
+    <div class="steplayout">
+      <aside class="stepnav" id="nav-product"></aside>
+      <div class="step-panels" id="panels-product">
+<!-- ========== P1 定位 ========== -->
+<div class="spanel" data-title="定位：是什么、有什么用" data-desc="痛点与解法 · 价值对照 · 业界关系">
+  <h2>第 1 步 · 定位：它是什么、有什么用、解决什么问题</h2>
+  <p class="pdesc"><b>一句话定位：</b>AgentEval-Lite 是一个本地优先的通用 AI Agent 评估框架——回答的不是「这个 Agent 聊得像不像人」，而是「<b>它到底有没有把任务做对</b>，证据在哪，换个时间重评分数还一样吗」。</p>
+
+  <h3 class="sec">有什么用：六个「你想要什么 → 它怎么解决 → 你得到什么」</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>你想要什么（问题）</th><th>它怎么解决（机制）</th><th>你得到什么（结果）</th></tr>
+    <tr><td><b>知道 Agent 到底能不能干活</b><br>demo 看着行，上手不确定</td><td>把业务做成「带隐藏标准答案的题」，Agent 在隔离工作区真干活、判分只认结构化产出</td><td>维度化分数 + 轮次轨迹：强在哪、弱在哪、离人工基线差多少，一页报告说清</td></tr>
+    <tr><td><b>升级不翻车</b><br>改了 prompt/模型/工具链，怕悄悄变差</td><td><code>suite</code> 批跑全部任务的确定性闭环 + <code>--fail-on-not-passed</code> 退出码门禁</td><td>PR 级回归防线：任何劣化在 CI 就红，不用等线上出事</td></tr>
+    <tr><td><b>多个 Agent 怎么选</b><br>供应商各说各话</td><td><code>agents.yaml</code> 把候选拉进同一考场，<code>--repeat k</code> 按 pass^k 判稳定性，时延/成本自动聚合</td><td>任务 × Agent 矩阵 + 排名面板：选型证据可复核，而不是听演示</td></tr>
+    <tr><td><b>不信 Agent 的自我报告</b><br>「我调了工具/改了文件/测过了」可能是编的</td><td>签名留痕 + call_id 核验 + 文件指纹比对 + 隐藏副本真跑测试 + 终态比对</td><td>结论全部有物证：编造过程直接一票否决，报告里的每个分数可溯源</td></tr>
+    <tr><td><b>评测经得起审计</b><br>「上周它能过」无法证明</td><td>评分携带引擎/规则/提交/工作区四指纹，<code>judge</code> 离线复算，<code>history</code> 聚合跨 run 趋势</td><td>同输入必同分；任何历史结论随时重算验证，评分标准变更可追溯</td></tr>
+    <tr><td><b>防被评者作弊</b><br>评估框架自己会不会被绕过？</td><td>隐藏判分 + canary 探针 + Docker 沙箱 + 19 项红队演练进 CI（fail-closed）</td><td>防线本身有回归测试：防不住的（残余风险）也白纸黑字告诉你</td></tr>
+  </table></div>
+
+  <h3 class="sec">它针对的三个根本痛点</h3>
+  <div class="grid g3">
+    <div class="card tight"><h4>自然语言输出无法验收</h4><p>Agent 说「我完成了」，但产出散落在对话里，没法机器判分。<br><b>→ 解法：</b>结构化提交契约。唯一有效产出是写进 inbox 的 JSON，信封 + 分型双重 Schema 校验，聊天内容一概不计分。</p></div>
+    <div class="card tight"><h4>Agent 自报不可信</h4><p>说调了工具、说改了文件、说测试过了——都可能是编的。<br><b>→ 解法：</b>过程留痕 + 交叉核验。工具调用经签名网关留痕，文件改动对指纹基线，测试在隐藏副本里真跑，终态与期望比对。</p></div>
+    <div class="card tight"><h4>评测结果无法复现审计</h4><p>「上周它能过」没法证明，评分标准也可能被摸透刷分。<br><b>→ 解法：</b>隐藏判分 + 四指纹。规则与答案在 Agent 永不可见的 hidden/，评分携带引擎/规则/提交/工作区指纹，可随时离线复算。</p></div>
+  </div>
+
+  <h3 class="sec">设计红线（为什么它是「Lite」）</h3>
+  <ul class="plain">
+    <li><b>零外部服务</b>：不依赖数据库、消息队列、SaaS 平台；所有状态落文件系统，一个 run 目录就是完整档案。</li>
+    <li><b>单 jar 交付</b>：Java 17 + 4 个运行期依赖，<code>mvn package</code> 出一个 shaded jar，任何机器 <code>java -jar</code> 即用。</li>
+    <li><b>目录即隔离</b>：Work / Hidden / Judge 靠目录物理分区 + 指纹 + canary 探针守卫；对不可信 Agent 再叠加 Docker 容器强隔离。</li>
+    <li><b>确定性优先</b>：15 种判分 check 里 14 种完全确定性；唯一的 LLM 判分被限制在低权重主观维度且禁止一票否决。15 种类型的分类全景表见<a href="#" data-jump="user:3">用户视角第 4 步</a>。</li>
+  </ul>
+
+  <h3 class="sec">与业界框架的关系（调研见 docs/04，四个 PoC 实跑验证）</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>框架</th><th>它做什么</th><th>与 AgentEval-Lite 的关系</th></tr>
+    <tr><td>promptfoo / DeepEval</td><td>LLM/Prompt 输出断言与回归</td><td>评的是「一次输出」；本框架评的是「多轮干活的过程与终态」。可互补做 prompt 层回归。</td></tr>
+    <tr><td>Inspect AI</td><td>生产级评估框架（Solver→Scorer）</td><td>范式借鉴对象；本框架把等价的 blocking 语义（工具真调用才给分）做成了本地零依赖版。</td></tr>
+    <tr><td>SWE-bench / tau-bench</td><td>代码修复 / 工具-用户交互基准</td><td>借其判分思想：PASS_TO_PASS 回归门、pass^k 可靠性、world_state 终态比对——已内化为 check 与 suite 口径。</td></tr>
+    <tr><td>Phoenix / Langfuse</td><td>Trace 可观测平台</td><td>互补：本框架自研签名留痕保证可信，<code>export</code> 转 OTLP/OpenInference 供其看板消费（Phoenix 实测端到端）。</td></tr>
+    <tr><td>garak / PyRIT</td><td>LLM 红队扫描</td><td>思路借鉴：本框架的红队回归针对「评估框架自身防作弊」，19 项演练进 CI。</td></tr>
+  </table></div>
+
+  <h3 class="sec">它不做什么（诚实边界）</h3>
+  <ul class="plain">
+    <li>不做 Agent 编排/运行平台——它只评估，被测 Agent 是黑盒。</li>
+    <li>不做浏览器/桌面级重环境评估（WebArena/OSWorld 类），刻意不引入 Playwright 链路（见 docs/04 §9）。</li>
+    <li>不做 RAG 专项评估与在线模型评分平台；LLM 判分仅作为低权重可选件。</li>
+    <li>暂无结果仓库与可视化看板（路线图待办，当前用报告文件 + OTLP 导出补位）。</li>
+  </ul>
+</div>
+
+<!-- ========== P2 核心机制 ========== -->
+<div class="spanel" data-title="八大核心机制" data-desc="点开每张卡，一句话讲透">
+  <h2>第 2 步 · 八大核心机制</h2>
+  <p class="pdesc">每张卡片一句大白话 + 机制落点。点开看细节，全部看完你就理解了这个框架的可信性从哪来。</p>
+  <div class="concepts" id="conceptGrid"></div>
+  <div class="note"><span class="nt t-info">想动手感受计分？</span>用户视角第 4 步有一个「评分沙盘」，装载了内置任务的真实规则，可以切开关看维度分与一票否决的效果。<a href="#" data-jump="user:3">直接跳过去 →</a></div>
+</div>
+
+<!-- ========== P3 运转原理 ========== -->
+<div class="spanel" data-title="一次评估如何运转" data-desc="八阶段流程 · 可播放 · 权限矩阵">
+  <h2>第 3 步 · 一次评估如何运转</h2>
+  <p class="pdesc">点击「播放」看八个阶段依次点亮，或直接点任意节点。每个阶段标注了执行者与防作弊落点——这张图同样是开发视角理解代码路径的地图。</p>
+
+  <div class="flowctl">
+    <button class="btn grad" id="flowPlay">播放 ▶</button>
+    <span class="fstep" id="flowStep">阶段 1 / 8</span>
+  </div>
+  <div class="flow" id="flowNodes"></div>
+  <div class="flowdetail" id="flowDetail"></div>
+
+  <h3 class="sec">谁能读写什么：权限矩阵</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>路径</th><th>Agent</th><th>框架</th><th>Judge</th><th>维护者</th></tr>
+    <tr><td><code>task.yaml</code>、<code>work/**</code></td><td>读</td><td>读</td><td>读</td><td><b>人工编写</b></td></tr>
+    <tr><td><code>hidden/**</code></td><td><span class="pill p-bad">禁</span></td><td>读</td><td>读</td><td><b>人工编写</b></td></tr>
+    <tr><td><code>workspace/**</code></td><td>读写</td><td>生成 + 基线指纹</td><td>只读副本</td><td>—</td></tr>
+    <tr><td><code>instructions.md</code>、<code>feedback/**</code></td><td>读</td><td><b>生成</b></td><td>—</td><td>—</td></tr>
+    <tr><td><code>inbox/**</code></td><td><b>写</b>（唯一提交通道）</td><td>读</td><td>读</td><td>—</td></tr>
+    <tr><td><code>judge/**</code>、<code>traces/**</code></td><td><span class="pill p-bad">禁</span></td><td>生成</td><td>写 / 读</td><td>复盘时读</td></tr>
+    <tr><td><code>report/**</code></td><td><span class="pill p-bad">禁</span></td><td>生成</td><td>—</td><td>读</td></tr>
+  </table></div>
+  <div class="note"><span class="nt t-info">为什么评审要在「临时副本」上执行？</span><code>command</code> 型检查（编译、跑隐藏测试）在 workspace 的临时副本上进行——评审不污染现场，Agent 的下一轮不会看到评审痕迹，同一提交离线重评也不受影响。</div>
+</div>
+
+<!-- ========== P4 接入与落地 ========== -->
+<div class="spanel" data-title="接入路径与适用场景" data-desc="三步落地 · 五类场景">
+  <h2>第 4 步 · 接入路径与适用场景</h2>
+  <p class="pdesc">评估者视角三步走，从零到接入 CI 大约半天；五类典型场景对号入座。</p>
+
+  <h3 class="sec">落地三步走</h3>
+  <ol class="steps">
+    <li><b>选题</b>：直接用 5 个内置任务摸底（代码修复 / API payload / 文档分析 / 工具调用纪律 / 需求评审），或 <code>task init</code> 为自己的业务出题。任务是纯目录资产，可以在团队间像代码一样评审与共享。</li>
+    <li><b>接 Agent</b>：四种适配（人工 / 回放 / 命令行 / HTTP 服务）覆盖绝大多数形态；不可信 Agent 叠加 <code>--sandbox docker</code>。接入成本 = 写一条命令模板或实现一个窄口径 HTTP 应答。</li>
+    <li><b>看结果、接 CI</b>：单 run 看 report.md；批量看 suite 矩阵与排名；CI 用 <code>--fail-on-not-passed</code> 退出码 3 挡 PR；过程数据 <code>export</code> 进 Phoenix / Langfuse 看板。</li>
+  </ol>
+
+  <h3 class="sec">五类典型场景</h3>
+  <div class="grid g2">
+    <div class="card tight"><h4>① 内部 Agent 能力度量</h4><p>把自研/采购的 Agent 在同一套任务上打分，维度得分 + 轮次轨迹说明「差在哪」。人工基线（manual）与 Agent 分数直接可比。</p></div>
+    <div class="card tight"><h4>② 回归门禁</h4><p>Agent 升级了 prompt / 模型 / 工具链？suite 批跑全部任务，闭环劣化立刻退出码 3。评估自身也有红队回归守着，防线不静默退化。</p></div>
+    <div class="card tight"><h4>③ 多 Agent 选型</h4><p>agents.yaml 把候选 Agent（含服务型）拉到同一考场，任务 × Agent 矩阵 + pass^k 稳定性 + 耗时/成本聚合，选型证据一页出。</p></div>
+    <div class="card tight"><h4>④ 安全与纪律评估</h4><p>工具调用纪律（必须真调、禁止越权）、泄露探针、终态比对——评的不只是「会不会做」，还有「守不守规矩」。</p></div>
+    <div class="card tight"><h4>⑤ 过程可观测</h4><p>长跑任务开 auto-eval 后台采样，得到「分数随时间演进」的过程曲线；trace 导出 OTLP 后在看板上逐 span 复盘。</p></div>
+    <div class="card tight"><h4>⑥ 评估资产沉淀</h4><p>每道题自带 fail→pass 回放样例，任务库本身就是可持续回归的资产；录制→回放机制让真实系统交互也能沉淀为确定性用例。</p></div>
+  </div>
+
+  <h3 class="sec">ROI 相关的两个细节</h3>
+  <ul class="plain">
+    <li><b>成本可见</b>：Agent 自报 usage（token/成本）会聚合进对比面板，但明确「只做参考、不参与评分、留痕可审计」——避免把不可信数据混进结论。</li>
+    <li><b>时延可比</b>：逐 run 墙钟时延自动采集聚合，「谁又快又稳」一栏可见。</li>
+  </ul>
+</div>
+
+<!-- ========== P5 安全与信任 ========== -->
+<div class="spanel" data-title="安全与信任边界" data-desc="攻防矩阵 · 诚实的残余风险">
+  <h2>第 5 步 · 安全与信任边界</h2>
+  <p class="pdesc">评估框架的公信力取决于「防作弊」。这里是主要攻击面与防线的对照，以及——同样重要的——<b>诚实声明的残余风险</b>。红队演练已并入 CI（Docker 就绪时 19 项全 DEFENDED），防线退化会挡 PR。</p>
+
+  <h3 class="sec">攻防矩阵（每张卡 = 一类已演练的攻击）</h3>
+  <div class="rtgrid" id="rtGrid"></div>
+
+  <h3 class="sec">诚实声明：仍存的残余风险</h3>
+  <div class="grid g2">
+    <div class="card tight"><h4>非容器模式的「外科式偷看」</h4><p>不开沙箱时 Agent 与框架同机同用户：只 <code>sed</code> 出隐藏答案数值、不整段转存也不触碰 canary，则无痕。<b>对不可信 Agent 请用 --sandbox docker，容器隔离是根治手段</b>（此项在红队基线中如实登记）。</p></div>
+    <div class="card tight"><h4>非容器模式的 nonce 重放</h4><p>command 检查的防短路 nonce 经命令行传给隐藏 harness，理论上进程可运行时读取自身命令行重放。挡得住「事先写死令牌」，挡不住「运行时动态重放」——同样由容器隔离根治。</p></div>
+    <div class="card tight"><h4>run 结束后的产物篡改</h4><p>签名密钥在 run 收尾（Agent 已停止）才落盘供离线复核；对已完成 run 的离线篡改属另一层威胁，靠目录指纹 + 从干净任务目录复算发现。</p></div>
+    <div class="card tight"><h4>Docker 沙箱的边界</h4><p>隔离强度取决于 Docker 本身（默认 root-in-container、共享内核）；镜像由评估方提供需自行确保可信；默认断网下工具网关不可达，需工具的任务用 bridge 回连。</p></div>
+  </div>
+  <div class="note"><span class="nt t-info">结论口径</span>默认（进程内硬化）模式：能挡住常见作弊手法，适合<b>受控的真实业务评估</b>（内部度量、CI 门禁、多轮回归）。启用 <code>--sandbox docker</code> 后补齐「外科式偷看」与「运行时 nonce 重放」，<b>可面向不可信 / 强对抗 Agent</b>。</div>
+</div>
+
+<!-- ========== P6 路线图 ========== -->
+<div class="spanel" data-title="现状与路线图" data-desc="已落地的 8 个阶段 · 待办">
+  <h2>第 6 步 · 现状与路线图</h2>
+  <p class="pdesc">项目按「先轻量可跑，再逐步增强」推进。以下阶段除最后一项外均已落地并有测试/红队回归守护。</p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 1</span>单机 CLI 闭环 <span class="pill p-ok">已落地</span></h4><p>TaskSpec / 三适配器 / 规则+脚本 Judge / trace / 报告 / resume / 5 示例任务。</p></div>
+    <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 1.5</span>可信硬化 <span class="pill p-ok">已落地</span></h4><p>工具网关常驻服务化 + trace HMAC 签名、command nonce 防短路、canary 扫描扩面、越权工具拦截、PASS_TO_PASS 回归门。</p></div>
+    <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 1.6</span>工程化 <span class="pill p-ok">已落地</span></h4><p>suite 任务集批跑 + CI 冒烟门禁（现为 CODEMAP / 测试 / 套件 / 红队四道闸）。</p></div>
+    <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 1.7</span>生产度量 <span class="pill p-ok">已落地</span></h4><p>真实 cli Agent 批量过任务、pass^k 可靠性、多 Agent 并列对比（矩阵 + 排名）、时延采集聚合。</p></div>
+    <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 1.8</span>可观测与质量门禁 <span class="pill p-ok">已落地</span></h4><p>OTLP/OpenInference 导出（Phoenix 实测）、world_state 终态比对、usage 成本聚合、红队门禁 fail-closed 化、JaCoCo + Checkstyle 进 CI。</p></div>
+    <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 2</span>服务接入与任务工程化 <span class="pill p-ok">已落地</span></h4><p>HTTP AgentAdapter 窄口径、task init 脚手架、validate 规则深度 lint。</p></div>
+    <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 3</span>真实信号 <span class="pill p-ok">已落地</span></h4><p>真实工具 http 后端（白名单 + 录制→回放晋升）、auto-eval 周期采样、llm_rubric LLM 判分（强约束）。</p></div>
+    <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 4</span>硬隔离 <span class="pill p-ok">Docker Runner 已落地</span></h4><p>--sandbox docker 容器强隔离，红队外科式偷看 + symlink/find 逃逸全部 DEFENDED，登记基线归 0。</p></div>
+    <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 4.5</span>分层与结果治理 <span class="pill p-ok">已落地</span></h4><p>task.yaml 可选 tier/labels 分层元数据 + suite --tier 按层批跑；agent-eval history 只读聚合历次 report.json，产出跨 run/Agent/版本趋势。</p></div>
+    <div class="tl-item pending"><div class="tl-dot"></div><h4><span class="ph">待办</span>持久化结果仓库与可视化看板 <span class="pill p-mid">规划中</span></h4><p>当前由报告文件 + suite 矩阵 + history 趋势 + OTLP 导出到 Phoenix/Langfuse 补位。</p></div>
+  </div>
+</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 开发视角 ================= -->
+<section class="view" id="view-dev">
+  <div class="container">
+    <div class="viewhead">
+      <div class="vh-k">DEVELOPER PERSPECTIVE</div>
+      <h1>开发视角：实现原理、架构与二次开发</h1>
+      <p>从技术栈与设计原则出发，走一遍模块地图和一次 run 的代码路径，然后按四条路线扩展它：新适配器、新 check、新任务、新子命令。</p>
+    </div>
+    <div class="steplayout">
+      <aside class="stepnav" id="nav-dev"></aside>
+      <div class="step-panels" id="panels-dev">
+<!-- ========== D1 技术栈与原则 ========== -->
+<div class="spanel" data-title="技术栈与设计原则" data-desc="为什么它可以这么简单">
+  <h2>第 1 步 · 技术栈与设计原则</h2>
+  <p class="pdesc">整个框架是一个 Java 17 + Maven 的 CLI 工程，运行期依赖只有 4 个。「简单」不是省事，而是可信性设计的一部分：依赖越少，评估结果越可审计。</p>
+
+  <h3 class="sec">技术栈一览</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>层面</th><th>选择</th><th>说明</th></tr>
+    <tr><td>语言 / 构建</td><td>Java 17 · Maven · shade 单 jar</td><td><code>bin/agent-eval</code> 是定位 jar 的薄包装脚本</td></tr>
+    <tr><td>CLI</td><td>picocli 4.7.7</td><td>10 个子命令：run / suite / judge / report / export / validate / list / history / tool / task</td></tr>
+    <tr><td>序列化</td><td>Jackson databind + yaml 2.19</td><td>task.yaml、规则、提交、trace 全走它</td></tr>
+    <tr><td>Schema 校验</td><td>networknt json-schema-validator 1.5.6</td><td>draft 2020-12；信封 + 6 分型 + judge 输出 + trace 事件共 9 个内置 schema</td></tr>
+    <tr><td>日志 / 测试</td><td>SLF4J simple · JUnit 5 + AssertJ</td><td>159 项测试；Docker 相关端到端用例无 Docker 环境自动跳过</td></tr>
+    <tr><td>刻意不引入</td><td>Spring · 数据库 · HTTP 服务框架</td><td>所有状态落文件系统；进程内唯一常驻服务是 loopback 工具网关</td></tr>
+  </table></div>
+
+  <h3 class="sec">五条设计原则（读代码前先装进脑子）</h3>
+  <div class="grid g2">
+    <div class="card tight"><h4>1 · 文件即状态</h4><p>没有数据库。run 目录自包含：resume、离线重评、报告重建都只凭目录还原上下文。好处是评估产物天然可归档、可 diff、可审计。</p></div>
+    <div class="card tight"><h4>2 · fail-closed</h4><p>加载校验不过就 fail-fast；工具白名单外一律拒绝；应答库缺失调用失败而不是放行；LLM 判分连不上按评审设施故障上抛，绝不静默打分。</p></div>
+    <div class="card tight"><h4>3 · 确定性优先</h4><p>判分默认全确定性（同输入必同分）；唯一非确定性的 llm_rubric 被 deep lint 强制「权重 ≤30%、禁止 blocking」，并在结果里如实标注。</p></div>
+    <div class="card tight"><h4>4 · 不可变值对象</h4><p>TaskSpec、AttemptInput/Outcome、JudgeResult 等全是 record；Judge 只依赖 JudgeInput 的只读视图，禁止读取 runs 之外的可变状态。</p></div>
+    <div class="card tight"><h4>5 · Agent 是黑盒，信任来自核验</h4><p>框架从不解析 Agent 的思考过程；一切结论都建立在可核验的物证上——签名留痕、指纹比对、隐藏副本里真跑。</p></div>
+    <div class="card tight"><h4>6 · 评审不污染现场</h4><p>command 型检查在 workspace 临时副本执行（ephemeral）；auto-eval 采样产物隔离在 judge/auto/。Agent 永远看不到评审的中间产物。</p></div>
+  </div>
+
+  <h3 class="sec">构建与本地开发命令</h3>
+  <div class="codeblock"><div class="codehead"><span class="cl">bash</span><button class="copybtn">复制</button></div><pre data-lang="bash"><code>mvn -q test        # JUnit 5 + AssertJ 测试套件
+mvn -q package     # 测试 + 打 shaded CLI jar 到 target/
+bash bin/ci-smoke.sh   # 与 CI 同口径四道闸：CODEMAP 漂移 → verify（Checkstyle + JaCoCo ≥0.75）→ suite 回放 → 红队回归</code></pre></div>
+  <div class="note"><span class="nt t-info">AI / 新人协作入口</span>动手前的三份地图：<code>AGENTS.md</code>（唯一权威协作指南：60 秒架构理解、分区路由、验证阶梯、安全红线）→ <code>docs/CODEMAP.md</code>（<code>bin/gen-codemap.sh</code> 自动生成的类级代码地图，CI 有漂移门禁保证与源码一致）→ <code>docs/PLAYBOOK.md</code>（6 类高频改造 recipe，与本视角第 5 步的扩展路线一一对应）。</div>
+</div>
+
+<!-- ========== D2 模块地图 ========== -->
+<div class="spanel" data-title="模块地图" data-desc="12 个包 · 点开看关键类">
+  <h2>第 2 步 · 模块地图：12 个包各管什么</h2>
+  <p class="pdesc">生产代码全部在 <code>src/main/java/com/agenteval</code> 下，按职责单向分层。点击任意卡片展开：职责、关键类、与谁协作。</p>
+
+  <h3 class="sec">数据流（从命令到报告）</h3>
+  <div class="flow" style="pointer-events:none">
+    <div class="fnode"><div class="fn">INPUT</div><div class="ft">cli</div><div class="fo">picocli 解析</div></div>
+    <div class="fnode"><div class="fn">ORCHESTRATE</div><div class="ft">runner</div><div class="fo">RunManager 主循环</div></div>
+    <div class="fnode"><div class="fn">PREPARE</div><div class="ft">task + workspace</div><div class="fo">规格 · 副本 · 指纹</div></div>
+    <div class="fnode"><div class="fn">EXECUTE</div><div class="ft">agent + tool</div><div class="fo">适配器 · 网关</div></div>
+    <div class="fnode"><div class="fn">EVALUATE</div><div class="ft">submission + judge</div><div class="fo">校验 · 判分</div></div>
+    <div class="fnode"><div class="fn">RECORD</div><div class="ft">trace + state</div><div class="fo">签名留痕 · 快照</div></div>
+    <div class="fnode"><div class="fn">OUTPUT</div><div class="ft">report</div><div class="fo">json + md</div></div>
+  </div>
+
+  <h3 class="sec">包一览（点击展开）</h3>
+  <div class="mods" id="modGrid"></div>
+</div>
+
+<!-- ========== D3 代码路径 ========== -->
+<div class="spanel" data-title="一次 run 的代码路径" data-desc="从 RunCommand 到 report.md">
+  <h2>第 3 步 · 一次 run 的完整代码路径</h2>
+  <p class="pdesc">入口是 <code>RunCommand.call()</code>：先 <code>buildAdapter()</code> 按 <code>--agent</code> 组装适配器（cli + <code>--sandbox docker</code> 时由 <code>SandboxSupport</code> 包为 <code>DockerAgentAdapter</code>），然后把一切交给 <code>RunManager.execute(RunConfig)</code>。</p>
+
+  <h3 class="sec">RunManager.execute 的九个动作</h3>
+  <ol class="steps">
+    <li><b>装载任务</b> —— <code>TaskSpecLoader.load()</code> 读 task.yaml，fail-fast 校验（task_id 与目录一致、维度权重和 = 满分、引用文件存在），产出不可变 <code>TaskSpec</code>。</li>
+    <li><b>准备现场</b> —— 生成 run_id 与目录骨架；<code>WorkspaceManager</code> 把 work/ 复制为私有 workspace，记录文件级 SHA-256 基线，并计算 hidden/ 目录树指纹。</li>
+    <li><b>渲染说明</b> —— <code>InstructionsRenderer</code> 由 TaskSpec 生成 instructions.md：题面 + 可见清单 + 提交契约 + 反馈位置（不含任何 hidden 信息）。</li>
+    <li><b>建立可信通道</b> —— <code>TraceSecret.obtain()</code> 生成每 run 私密签名密钥（只存内存）；<code>ToolGatewayServer.start()</code> 在 loopback 临时端口拉起常驻工具网关，凭 token 访问。</li>
+    <li><b>attempt 循环</b> —— 对每轮调用 <code>adapter.runAttempt(AttemptInput)</code>（阻塞至 Agent 结束或超时），期间 Agent 读说明、干活、可经网关调工具、把 JSON 写进 inbox。</li>
+    <li><b>收提交</b> —— <code>SubmissionManager</code> 做信封 + 分型双重 Schema 校验与 task/attempt 绑定校验；不合格记 <code>submission_invalid</code>，反馈 schema 错误清单，消耗一轮但不进评分。</li>
+    <li><b>判分与反馈</b> —— <code>JudgeRunner</code> 组装只读 <code>JudgeInput</code> 交给 <code>RulesJudge</code>（可叠加 <code>ScriptJudge</code>）；完整结果落 judge/，<code>FeedbackPolicy</code> 按任务配置裁剪出受控反馈写 feedback/。达线提前结束；Agent 自称完成但未达线且有余量 → 记 <code>stop_hook_triggered</code> 携反馈续轮。</li>
+    <li><b>逐轮快照</b> —— <code>RunStateStore</code> 原子落盘 run_state.json；<code>--resume</code> 校验 hidden 指纹后从下一轮继续，被篡改则 INTEGRITY_BROKEN 熔断。</li>
+    <li><b>终局</b> —— <code>BestAttemptSelector</code> 按 selection 策略（best_score / first_pass / last）选最佳轮；<code>ReportGenerator</code> 产出 report.json/md；收尾时（Agent 已停止）<code>TraceSecret.save()</code> 才把签名密钥落盘供离线复核与 resume。</li>
+  </ol>
+
+  <h3 class="sec">适配器 SPI：接入面有多小</h3>
+  <p>看完这个接口你就明白为什么「任何东西」都能接进来——适配器唯一的义务是：在超时预算内驱动 Agent，让提交出现在 inbox。</p>
+  <div class="codeblock"><div class="codehead"><span class="cl">java · com.agenteval.agent</span><button class="copybtn">复制</button></div><pre data-lang="java"><code>/** Agent 适配器 SPI：把「任何能产出提交文件的东西」接入评估循环。 */
+public interface AgentAdapter {
+    String name();
+    /** 执行一轮 attempt：驱动 Agent 工作直至其产出提交或放弃。 */
+    AttemptOutcome runAttempt(AttemptInput input);
+}
+
+/** 一轮的输入：任务上下文 / attempt id / 说明文件 / 上轮反馈 / 超时预算 / 工具通道 */
+public record AttemptInput(TaskContext context, String attemptId, int attemptNumber,
+        Path instructionsFile, Path previousFeedbackFile, Duration timeout, ToolAccess toolAccess) { }
+
+/** 一轮的结果：提交文件（可为 null）/ 是否自称完成 / 退出码 / 日志 / 是否已无后续输入 */
+public record AttemptOutcome(Path submissionFile, boolean agentDeclaredDone,
+        int exitCode, Path agentLogFile, boolean exhausted) { }</code></pre></div>
+  <p style="font-size:13.5px;color:var(--muted)">五个实现：<code>ManualAgentAdapter</code>（人工）、<code>ScriptedAgentAdapter</code>（回放模拟器，支持 apply_files / tool_calls / 提交模板占位符）、<code>CliAgentAdapter</code>（命令模板 + <code>AgentProcess</code> 进程管控）、<code>HttpAgentAdapter</code>（窄口径 POST 契约）、<code>DockerAgentAdapter</code>（把 cli 命令包进 <code>docker run --rm</code>，由 <code>DockerSandbox</code> 构造挂载面）。</p>
+</div>
+
+<!-- ========== D4 关键机制实现 ========== -->
+<div class="spanel" data-title="关键机制的实现细节" data-desc="判分引擎 · 签名链路 · 网关 · 沙箱">
+  <h2>第 4 步 · 关键机制的实现细节</h2>
+  <p class="pdesc">四个最值得读源码的机制点，每个都给出「在哪个类、怎么做到的」。</p>
+
+  <h3 class="sec">① 规则引擎：一个 switch 分派 15 种 check</h3>
+  <p><code>RulesJudge</code>（约 700 行）逐条执行 <code>hidden/judge.rules.yaml</code> 里的 checks，按类型分派。每个 check 产出 <code>CheckOutcome</code>（earned/possible/passed/blocking/对外文案），最后按「维度得分 = 权重 × Σearned/Σpossible」聚合：</p>
+  <div class="codeblock"><div class="codehead"><span class="cl">java · RulesJudge（真实片段）</span><button class="copybtn">复制</button></div><pre data-lang="java"><code>case "json_schema"            -&gt; jsonSchema(def, input);
+case "jsonpath_equals"        -&gt; jsonpathEquals(def, input);      // 支持 expected / expected_from / tolerance
+case "jsonpath_exists"        -&gt; jsonpathExists(def, input);
+case "jsonpath_matches"       -&gt; jsonpathMatches(def, input);
+case "list_coverage"          -&gt; listCoverage(def, input);        // 关键点组覆盖率，部分得分
+case "evidence_sources_valid" -&gt; evidenceSourcesValid(def, input);
+case "workspace_file_exists"  -&gt; workspaceFileExists(def, input);
+case "workspace_file_contains"-&gt; workspaceFileContains(def, input);
+case "changed_files_verified" -&gt; changedFilesVerified(def, input);// 对 WorkspaceManager 的基线指纹
+case "command"                -&gt; command(def, input, ephemeralWorkspace); // 临时副本 + nonce 防短路
+case "tool_call_required"     -&gt; toolCallRequired(def, input);    // 只认签名可核验的 trace 事件
+case "tool_call_forbidden"    -&gt; toolCallForbidden(def, input);
+case "world_state"            -&gt; worldState(def, input);          // 可信写调用折叠为终态，与期望比对
+case "no_canary_leak"         -&gt; noCanaryLeak(def, rules, input); // 扫 submission/workspace/agent-logs/inbox/traces
+case "llm_rubric"             -&gt; LlmRubricJudge.run(def, input);  // 唯一非确定性：低权重、禁 blocking</code></pre></div>
+  <div class="note"><span class="nt t-info">每种 check 怎么配</span>面向出题人的分类全景表 + 逐个可抄的 YAML 示例在<a href="#" data-jump="user:3">用户视角第 4 步</a>；新增 check 类型的改造 recipe 见本视角<a href="#" data-jump="dev:4">第 5 步</a>与 <code>docs/PLAYBOOK.md</code>。</div>
+
+  <h3 class="sec">② trace 防伪造：HMAC 签名链路</h3>
+  <ol class="steps">
+    <li><code>TraceSecret.obtain()</code> 每 run 生成私密密钥——<b>只存框架内存，Agent 执行期间不落盘</b>（这是安全不变量）。</li>
+    <li><code>TraceLogger</code> 写每条事件前由 <code>TraceSigner.sign()</code> 计算 HMAC-SHA256，写入 <code>_sig</code> 字段，append-only。</li>
+    <li>判分侧只统计 <code>TraceSigner.verify()</code> 通过的 <code>tool_call</code> 事件——Agent 直接往 trace.jsonl 手写伪造事件（无合法签名）被静默丢弃。</li>
+    <li>run 收尾（Agent 已停止）密钥才落盘，供离线复核与 resume 续签。</li>
+  </ol>
+  <div class="codeblock"><div class="codehead"><span class="cl">jsonl · traces/trace.jsonl 真实事件行</span><button class="copybtn">复制</button></div><pre data-lang="json"><code>{"event_id":"evt_000001","run_id":"run_20260707_093454_sfpj","seq":1,"timestamp":"2026-07-07T01:34:54.848Z",
+ "type":"run_started","payload":{"agent":"scripted","task_id":"api-payload-001",
+ "engine_version":"agent-eval-lite/0.1.0","workspace_fingerprint":"c253cef2…","hidden_fingerprint":"3b8ffdb1…"},
+ "_sig":"db2c74bf88832294924febd83beb9829bc2644829e187953629ab2410db8c6d4"}</code></pre></div>
+  <p style="font-size:13.5px;color:var(--muted)">17 类事件覆盖全生命周期：run_started / agent_started / agent_finished / tool_call / shell_command / submission_received / submission_invalid / judge_started / judge_completed / auto_eval_sampled / feedback_delivered / stop_hook_triggered / resume / error / usage_recorded / final_selection / run_completed。<code>OtlpTraceExporter</code> 把它们确定性映射为三层 span（trace/span id 由 run/attempt/call id 派生，幂等重推不分叉）。</p>
+
+  <h3 class="sec">③ 工具网关：框架进程内的常驻服务</h3>
+  <ul class="plain">
+    <li><code>ToolGatewayServer</code> 监听 loopback 临时端口，token 鉴权；Agent 侧 <code>agent-eval tool call</code>（<code>ToolGatewayClient</code>）经它调用——网关是「框架的手」，不是 Agent 派生的子进程，所以留痕可信。</li>
+    <li><code>ToolGateway</code> 按任务 <code>allowed_tools</code> fail-closed 拦截，未授权工具记 <code>error=tool_not_allowed</code> 且不产生成功调用记录。</li>
+    <li>应答两条通道：<code>replay</code>（默认，hidden/tools 应答库，零外呼）与 <code>live</code>（<code>ToolHttpBackend</code> 按 task.yaml 静态声明的 URL 真实外呼，同格式存档供晋升回放）。URL/method/headers 全静态声明，Agent 入参只作请求负载，<b>改不了外呼目标</b>。</li>
+    <li>Docker 沙箱 + bridge 网络时，容器内经 <code>host.docker.internal</code> 回连宿主网关，token 仍作纵深防御。</li>
+  </ul>
+
+  <h3 class="sec">④ Docker 沙箱：挂载面即安全边界</h3>
+  <div class="codeblock"><div class="codehead"><span class="cl">bash · DockerSandbox 生成的容器形态（示意）</span><button class="copybtn">复制</button></div><pre data-lang="bash"><code>docker run --rm --network none \
+  -v &lt;run&gt;/workspace:/ael/workspace:rw \      # Agent 干活区
+  -v &lt;run&gt;/inbox:/ael/inbox:rw \              # 唯一提交通道
+  -v &lt;run&gt;/feedback:/ael/feedback:ro \        # 受控反馈（只读）
+  -v &lt;run&gt;/instructions.md:/ael/instructions.md:ro \
+  &lt;--sandbox-image&gt; sh -c '&lt;你的 agent 命令&gt;'
+# hidden/、judge/、traces/、任务目录、宿主家目录 —— 都不在容器文件系统里
+# 占位符替换为容器内路径（/ael/workspace …）；{run_dir} 因含评审禁区而置空</code></pre></div>
+  <p style="font-size:13.5px;color:var(--muted)"><code>DockerAvailability</code> 在 run 前探测 docker 可用性，未就绪以退出码 1 前移拦截，不会误记为 Agent 低分；<code>--sandbox-tool-jar</code> 把 CLI jar 挂入容器供工具调用（默认自动探测当前运行 jar）。</p>
+</div>
+
+<!-- ========== D5 二次开发 ========== -->
+<div class="spanel" data-title="二次开发指南" data-desc="四条扩展路线，从易到难">
+  <h2>第 5 步 · 二次开发指南</h2>
+  <p class="pdesc">四条最常见的扩展路线，按改动面从小到大排序。共同纪律：新能力必须带测试，判分相关的还要考虑红队回归。</p>
+
+  <details class="acc" open><summary><span class="lbl">路线 A</span>新增一个任务（不写 Java，最常见）</summary><div class="accbody">
+    <p>这就是用户视角第 4 步的建题五步法：<code>task init</code> 脚手架 → 改 task.yaml 与 work/ → 写 hidden 规则 → <code>validate</code> → samples 闭环。任务是纯目录资产，合入后 <code>suite</code> 批跑自动把它纳入 CI 回归。</p>
+    <p><b>约定</b>：任务 ID kebab-case 加数字后缀；YAML 字段 snake_case；评审专用数据只进 <code>hidden/</code>，别把 expected 复制到 work/、公开文档或样例。</p>
+  </div></details>
+
+  <details class="acc"><summary><span class="lbl">路线 B</span>新增一种判分 check</summary><div class="accbody">
+    <ol class="steps">
+      <li>在 <code>RulesJudge</code> 的 switch 加一个 case，实现私有方法：读 <code>def</code>（规则里的参数）与 <code>JudgeInput</code>（只读视图），返回 <code>CheckOutcome</code>。<b>禁止读取 runs 之外的可变状态</b>，保持确定性。</li>
+      <li>若 check 引用 hidden 文件或工具，在 <code>ValidateCommand</code> 的深度 lint 里加对应的前移拦截（断链/缺失/越白名单在 validate 时报错，而不是 run 时炸）。</li>
+      <li>在 <code>src/test/java/com/agenteval/judge/</code> 加单测（正例/反例/边界），必要时给内置任务或 <code>testsupport</code> 夹具加用例。</li>
+      <li>如果这个 check 承担防作弊职责，在 <code>redteam/</code> 加一个攻击演练目录并登记进 <code>run_all.sh</code>，把防线钉进 CI。</li>
+    </ol>
+  </div></details>
+
+  <details class="acc"><summary><span class="lbl">路线 C</span>新增一种 Agent 适配器</summary><div class="accbody">
+    <ol class="steps">
+      <li>实现 <code>AgentAdapter</code>：在 <code>runAttempt</code> 里驱动你的 Agent（进程/RPC/消息队列都行），遵守 <code>input.timeout()</code>，结束时返回 <code>AttemptOutcome</code>（提交文件路径或 null）。参考 <code>HttpAgentAdapter</code>（约 200 行）最容易上手。</li>
+      <li>在 <code>RunCommand.buildAdapter()</code> 与 <code>SuiteCommand</code>（含 agents.yaml 解析）接线新的 <code>--agent</code> 取值与参数。</li>
+      <li>把「Agent 必须知道的事」都从 <code>AttemptInput</code> 取：instructions 路径、inbox、attempt_id、上轮反馈、工具通道 <code>ToolAccess</code>——不要私自读 run 目录其他位置。</li>
+      <li>加集成测试（<code>integration</code> 包）：用假 Agent 跑通 fail→pass 闭环；外部依赖不可用时用 assumption 自动跳过（参考 Docker 用例的做法）。</li>
+    </ol>
+  </div></details>
+
+  <details class="acc"><summary><span class="lbl">路线 D</span>新增一个 CLI 子命令</summary><div class="accbody">
+    <ol class="steps">
+      <li>在 <code>com.agenteval.cli</code> 建 picocli <code>@Command</code> 类（参考 <code>ExportCommand</code>，最小）。</li>
+      <li>注册进 <code>Main</code> 的 <code>subcommands</code> 列表。</li>
+      <li>遵守退出码约定：0 正常 / 1 参数输入错误 / 2 框架故障 / 3 门禁未过；错误信息走 stderr。</li>
+      <li>只读命令保持幂等（对齐 <code>report</code> 的「从工件重建、纯读」姿态）。</li>
+    </ol>
+  </div></details>
+
+  <h3 class="sec">代码风格速记</h3>
+  <ul class="plain">
+    <li>四空格缩进；类/record 用 PascalCase，方法字段 camelCase；值对象偏向不可变 record 或 final 类。</li>
+    <li>公开 API 按现有风格写中文 Javadoc，核心类型保留 <code>@author</code> 与 <code>@since</code>；Checkstyle 在 CI 强制。</li>
+    <li>单测 <code>*Test.java</code> 与被测包同路径；端到端进 <code>integration</code> 包。</li>
+  </ul>
+</div>
+
+<!-- ========== D6 调试与质量保障 ========== -->
+<div class="spanel" data-title="调试、测试与质量门禁" data-desc="排障姿势 · 红队 · CI">
+  <h2>第 6 步 · 调试、测试与质量门禁</h2>
+  <p class="pdesc">评估框架自己也要被评估。这一步讲：怎么排障、框架用什么守住自己的质量。</p>
+
+  <h3 class="sec">排障工具箱</h3>
+  <div class="grid g2">
+    <div class="card tight"><h4>分数可疑 → 离线复算</h4><p><code>agent-eval judge --task … --submission …</code> 对任意历史提交重评；完整判分细节（含 private_notes、每条 check 的 earned/possible）在 <code>judge/attempt_NNN.judge.json</code>。</p></div>
+    <div class="card tight"><h4>报告丢了 → 从工件重建</h4><p><code>agent-eval report --run runs/xxx/run_yyy</code> 纯读幂等地重建 report.json/md——报告永远是 trace + judge 工件的投影，不存独立状态。</p></div>
+    <div class="card tight"><h4>进程被杀 → 断点续跑</h4><p><code>run --resume &lt;run 目录&gt; --agent …</code> 从 run_state.json 的下一轮继续；恢复前校验 hidden 指纹，被篡改则 INTEGRITY_BROKEN 熔断（退出码 2）。</p></div>
+    <div class="card tight"><h4>过程看不清 → trace / 看板</h4><p>直接读 <code>traces/trace.jsonl</code>（每行一个签名事件），或 <code>export</code> 成 OTLP 推到 Phoenix / Langfuse 逐 span 复盘；auto-eval 采样事件里有分数轨迹。</p></div>
+  </div>
+
+  <h3 class="sec">框架自身的三层质量网</h3>
+  <ol class="steps">
+    <li><b>单元 + 端到端测试（159 项）</b> —— judge 引擎逐 check 正反例、submission 校验、trace 签名、report、resume，加上 5 个内置任务的 fail→pass 回放端到端；<code>mvn clean verify</code> 同时跑 Checkstyle 与 JaCoCo 指令覆盖率 ≥ 0.75 下限。</li>
+    <li><b>任务集回放门禁</b> —— <code>suite --fail-on-not-passed</code>：任何改动破坏了任一任务的确定性闭环，CI 直接红。</li>
+    <li><b>红队回归（fail-closed）</b> —— <code>redteam/run_all.sh</code> 演练 16 类攻击（偷看 hidden、伪造 trace、command 短路、越权工具、canary 外泄、终态造假…）。判定逻辑抽为 <code>gate_lib.sh</code> 纯函数并由 <code>test_gate.sh</code> 正/负向自测钉死：VULNERABLE 超出登记基线、观测偏离预期、报告缺失——任一发生即失败，产出结构化工件 <code>redteam_report.json</code>。</li>
+  </ol>
+  <div class="note"><span class="nt t-info">红队基线的自适应</span>Docker 就绪时红队 A 在容器内演练，19 项全 DEFENDED、登记基线 0；无 Docker 则回退非容器路径（17 项）并如实保留 1 项 VULNERABLE 登记（外科式偷看）。CI 另设强制 Docker job（<code>RT_REQUIRE_DOCKER=1</code> 且 <code>RT_ALLOWED_VULN=0</code>，镜像按 digest 固定），专门防「隔离能力静默降级」。</div>
+
+  <h3 class="sec">环境变量速查（框架/Agent/评审三侧）</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>变量</th><th>谁用</th><th>作用</th></tr>
+    <tr><td><code>AEL_RUN_DIR</code> 等 6 个</td><td>Agent 进程</td><td>cli 模式自动注入：run 目录、说明、工作区、收件箱、attempt id、反馈（详表见用户视角第 2 步）</td></tr>
+    <tr><td><code>AEL_TOOL_ENDPOINT</code> / <code>AEL_TOOL_TOKEN</code></td><td>tool call 子命令</td><td>常驻网关的地址与凭证（框架注入，Agent 无需关心）</td></tr>
+    <tr><td><code>AEL_TOOL_MODE</code></td><td>运行方</td><td><code>replay</code>（默认，确定性）/ <code>live</code>（真实外呼并录制）</td></tr>
+    <tr><td><code>AEL_LLM_ENDPOINT</code> / <code>AEL_LLM_MODEL</code> / <code>AEL_LLM_API_KEY</code></td><td>llm_rubric 判分</td><td>OpenAI 兼容 chat completions；凭证只在框架进程，Agent 不可见</td></tr>
+    <tr><td><code>AEL_SUBMISSION</code> / <code>AEL_HIDDEN</code> / <code>AEL_TRACE</code> / <code>AEL_TASK_YAML</code></td><td>script judge</td><td>外部评分脚本（judge.py / judge.sh）的输入注入</td></tr>
+    <tr><td><code>RT_ALLOWED_VULN</code> / <code>RT_REQUIRE_DOCKER</code></td><td>红队门禁</td><td>登记基线与强制容器开关</td></tr>
+  </table></div>
+</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="frow">
+    <div>
+      <b style="color:var(--muted)">AgentEval-Lite</b> · 交互式导览（单文件，离线可用）<br>
+      深入阅读：仓库 <code>README.md</code> · <code>docs/01</code> 代码库理解 · <code>docs/02</code> EdgeBench/SForge 调研 · <code>docs/03</code> 设计方案 · <code>docs/04</code> 成熟框架调研与 ROI
+    </div>
+    <div style="text-align:right">
+      引擎 <code>agent-eval-lite/0.1.0</code> · Java 17 + Maven<br>
+      本页内容基于仓库当前代码与真实运行产物生成
+    </div>
+  </div>
+</footer>
+
+<script>
+"use strict";
+/* ================================================================
+   AgentEval-Lite 交互式导览 · 全部交互逻辑（无外部依赖）
+   ================================================================ */
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const esc = t => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/* ---------------- 1. 视图路由 + 步进器 ---------------- */
+const VIEWS = ["overview", "user", "product", "dev"];
+const NEXT_VIEW = { user: ["product", "继续看产品视角 →"], product: ["dev", "继续看开发视角 →"], dev: ["overview", "回到总览"] };
+const state = { view: "overview", step: { user: 0, product: 0, dev: 0 } };
+
+function buildStepper(view) {
+  const nav = $("#nav-" + view), panels = $$("#panels-" + view + " > .spanel");
+  panels.forEach((p, i) => {
+    const item = document.createElement("button");
+    item.className = "snav-item";
+    item.innerHTML = `<span class="snum">${i + 1}</span><span><span class="st">${p.dataset.title}</span><br><span class="sd">${p.dataset.desc || ""}</span></span>`;
+    item.addEventListener("click", () => goStep(view, i));
+    nav.appendChild(item);
+    const foot = document.createElement("div");
+    foot.className = "stepfoot";
+    const prev = document.createElement("button");
+    prev.className = "btn"; prev.textContent = "← 上一步";
+    prev.disabled = i === 0;
+    prev.addEventListener("click", () => goStep(view, i - 1));
+    const next = document.createElement("button");
+    next.className = "btn grad";
+    if (i < panels.length - 1) {
+      next.textContent = "下一步：" + panels[i + 1].dataset.title + " →";
+      next.addEventListener("click", () => goStep(view, i + 1));
+    } else {
+      next.textContent = NEXT_VIEW[view][1];
+      next.addEventListener("click", () => go(NEXT_VIEW[view][0]));
+    }
+    foot.append(prev, next);
+    p.appendChild(foot);
+  });
+  const prog = document.createElement("div");
+  prog.className = "snav-progress";
+  prog.innerHTML = `<span class="ptext"></span><div class="bar"><div class="fill"></div></div>`;
+  nav.appendChild(prog);
+}
+
+function goStep(view, idx, noScroll) {
+  const panels = $$("#panels-" + view + " > .spanel");
+  idx = Math.max(0, Math.min(idx, panels.length - 1));
+  state.step[view] = idx;
+  panels.forEach((p, i) => p.classList.toggle("active", i === idx));
+  $$("#nav-" + view + " .snav-item").forEach((n, i) => {
+    n.classList.toggle("active", i === idx);
+    n.classList.toggle("done", i < idx);
+  });
+  const nav = $("#nav-" + view);
+  $(".ptext", nav).textContent = `进度 ${idx + 1} / ${panels.length}`;
+  $(".fill", nav).style.width = ((idx + 1) / panels.length * 100) + "%";
+  if (state.view === view) history.replaceState(null, "", "#" + view + "/" + (idx + 1));
+  if (!noScroll) window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function go(view, step) {
+  state.view = view;
+  VIEWS.forEach(v => $("#view-" + v).classList.toggle("active", v === view));
+  $$(".navbtn").forEach(b => b.classList.toggle("active", b.dataset.go === view));
+  if (view === "overview") history.replaceState(null, "", "#overview");
+  else goStep(view, step !== undefined ? step : state.step[view], true);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+document.addEventListener("click", e => {
+  const g = e.target.closest("[data-go]");
+  if (g) { go(g.dataset.go); return; }
+  const j = e.target.closest("[data-jump]");
+  if (j) { e.preventDefault(); const [v, s] = j.dataset.jump.split(":"); go(v, +s); }
+});
+document.addEventListener("keydown", e => {
+  if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if (state.view === "overview") return;
+  if (e.key === "ArrowRight") goStep(state.view, state.step[state.view] + 1);
+  if (e.key === "ArrowLeft") goStep(state.view, state.step[state.view] - 1);
+});
+
+/* ---------------- 2. 轻量语法高亮 ---------------- */
+function hlJson(t) {
+  return t.replace(/("(?:[^"\\]|\\.)*")(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+    (m, str, colon, bool, num) => {
+      if (str && colon) return `<span class="tok-k">${str}</span>${colon}`;
+      if (str) return `<span class="tok-s">${str}</span>`;
+      if (bool) return `<span class="tok-b">${bool}</span>`;
+      if (num) return `<span class="tok-n">${num}</span>`;
+      return m;
+    });
+}
+function hlLine(line, lang) {
+  let head = line, tail = "";
+  const hash = line.search(/(^|\s)#/);
+  if (hash >= 0 && !(lang === "bash" && line.trim().startsWith("#!"))) {
+    const at = line.indexOf("#", hash);
+    head = line.slice(0, at); tail = `<span class="tok-c">${line.slice(at)}</span>`;
+    if (!head.trim()) return tail;
+  }
+  head = head.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, `<span class="tok-s">$1</span>`);
+  if (lang === "yaml") {
+    head = head.replace(/^(\s*(?:- )?)([A-Za-z_][\w.]*)(:)(?=\s|$)/, `$1<span class="tok-k">$2</span>$3`);
+    head = head.replace(/\b(true|false|null)\b/g, `<span class="tok-b">$1</span>`);
+  }
+  if (lang === "bash") {
+    head = head.replace(/(^|\s)(bin\/agent-eval|mvn|bash|cat|docker|java|claude)(?=\s|$)/g, `$1<span class="tok-p">$2</span>`);
+    head = head.replace(/(\s)(--?[\w-]+)/g, `$1<span class="tok-k">$2</span>`);
+  }
+  return head + tail;
+}
+function hlJava(t) {
+  return t.replace(/(\/\*[\s\S]*?\*\/)|(\/\/[^\n]*)|("(?:[^"\\]|\\.)*")|(@\w+)|\b(public|private|interface|record|default|return|new|class|static|final|void|boolean|int|case|package|import|enum|extends|implements)\b/g,
+    (m, blk, ln, str, an, kw) => {
+      if (blk || ln) return `<span class="tok-c">${blk || ln}</span>`;
+      if (str) return `<span class="tok-s">${str}</span>`;
+      if (an) return `<span class="tok-an">${an}</span>`;
+      if (kw) return `<span class="tok-kw">${kw}</span>`;
+      return m;
+    });
+}
+function highlightAll() {
+  $$("pre[data-lang] > code").forEach(code => {
+    const lang = code.parentElement.dataset.lang;
+    const raw = code.textContent;
+    if (lang === "json") code.innerHTML = hlJson(esc(raw));
+    else if (lang === "java") code.innerHTML = hlJava(esc(raw));
+    else code.innerHTML = esc(raw).split("\n").map(l => hlLine(l, lang)).join("\n");
+  });
+}
+
+/* ---------------- 3. 复制按钮 ---------------- */
+document.addEventListener("click", e => {
+  const btn = e.target.closest(".copybtn");
+  if (!btn) return;
+  const pre = $("pre", btn.closest(".codeblock"));
+  if (!pre) return;
+  const write = navigator.clipboard
+    ? navigator.clipboard.writeText(pre.textContent)
+    : Promise.reject();
+  write.then(() => {
+    btn.textContent = "已复制 ✓"; btn.classList.add("ok");
+    setTimeout(() => { btn.textContent = "复制"; btn.classList.remove("ok"); }, 1300);
+  }).catch(() => { btn.textContent = "复制失败"; });
+});
+
+/* ---------------- 4. 终端回放 ---------------- */
+const TERM_SCRIPT = {
+  t1: [
+    { t: "cmd", x: "bin/agent-eval run --task tasks/api-payload-001 --agent scripted \\" },
+    { t: "cmd2", x: "    --script tasks/api-payload-001/samples/replay.yaml" },
+    { t: "info", x: "[main] INFO com.agenteval.runner.RunManager - run run_20260707_093454_sfpj 启动，任务 api-payload-001，agent scripted", d: 500 },
+    { t: "dim", x: "# ↳ 导览注解：attempt_001 提交收取 → 双 Schema 校验通过 → 进入隐藏评审", d: 700 },
+    { t: "bad", x: "# ↳ attempt_001 得分 35.0/100（correctness 0 · format 20 · evidence 15 · explanation 0），未达通过线 80", d: 900 },
+    { t: "dim", x: "# ↳ 受控反馈写出 feedback/attempt_001.feedback.json —— 指出「金额/加急/解释」三处方向，不含期望值", d: 900 },
+    { t: "ok", x: "# ↳ attempt_002 按反馈修正后提交 → 得分 100.0/100，达线，提前结束循环", d: 1000 },
+    { t: "info", x: "[main] INFO com.agenteval.runner.RunManager - run run_20260707_093454_sfpj 结束: PASSED（passed）", d: 600 },
+    { t: "text", x: "", d: 200 },
+    { t: "head", x: "========== 评估完成 ==========", d: 250 },
+    { t: "text", x: "run_id : run_20260707_093454_sfpj", d: 120 },
+    { t: "text", x: "状态   : PASSED（最佳 100.0 分，attempt_002）", d: 120 },
+    { t: "text", x: "目录   : runs/api-payload-001/run_20260707_093454_sfpj", d: 120 },
+    { t: "text", x: "报告   : runs/api-payload-001/run_20260707_093454_sfpj/report/report.md", d: 120 }
+  ]
+};
+const TERM_CLS = { cmd: "tl-cmd", cmd2: "tl-cmd", info: "tl-info", dim: "tl-dim", ok: "tl-ok", bad: "tl-bad", head: "tl-head", text: "tl-cmd" };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function playTerm(id, btn) {
+  const body = $("#term-" + id);
+  btn.disabled = true; btn.textContent = "播放中…";
+  body.innerHTML = "";
+  for (const line of TERM_SCRIPT[id]) {
+    const div = document.createElement("div");
+    div.className = TERM_CLS[line.t] || "tl-cmd";
+    body.appendChild(div);
+    if (line.t === "cmd" || line.t === "cmd2") {
+      if (line.t === "cmd") { const p = document.createElement("span"); p.className = "pr"; p.textContent = "$ "; div.appendChild(p); }
+      const span = document.createElement("span"); div.appendChild(span);
+      const cur = document.createElement("span"); cur.className = "cursor"; div.appendChild(cur);
+      for (const ch of line.x) { span.textContent += ch; await sleep(11); }
+      cur.remove();
+      if (line.t === "cmd2") await sleep(420);
+    } else {
+      await sleep(line.d || 300);
+      div.textContent = line.x || "\u00a0";
+      if (line.t === "dim" || line.t === "ok" || line.t === "bad") div.style.fontStyle = line.x.startsWith("#") ? "italic" : "normal";
+    }
+    body.scrollTop = body.scrollHeight;
+  }
+  btn.disabled = false; btn.textContent = "重播 ▶";
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest(".playbtn");
+  if (b && b.dataset.term) playTerm(b.dataset.term, b);
+});
+
+/* ---------------- 5. 命令生成器 ---------------- */
+const CMD_TPL = {
+  cli: {
+    cmd: `bin/agent-eval run --task tasks/code-fix-001 --agent cli \\
+    --cmd 'claude -p "$(cat {instructions})" --dangerously-skip-permissions' \\
+    --model claude-sonnet`,
+    note: "把 --cmd 换成你的 Agent 命令模板即可（cursor-agent、codex、自研 CLI 同理）；占位符自动替换并做 shell 转义。--model 仅用于报告归档。批量评估时把 run 换成 suite，参数一致。"
+  },
+  cliSandbox: (net) => ({
+    cmd: `bin/agent-eval run --task tasks/code-fix-001 --agent cli --sandbox docker \\
+    --sandbox-image my-agent-image:latest \\${net ? "\n    --sandbox-network bridge \\" : ""}
+    --cmd 'claude -p "$(cat {instructions})" --dangerously-skip-permissions'`,
+    note: net
+      ? "bridge 模式下容器经 host.docker.internal 回连宿主的常驻工具网关（token 纵深防御）；镜像需自带 JRE 供 agent-eval tool call 使用（--sandbox-tool-jar 默认自动探测挂入）。"
+      : "容器只挂载 workspace/inbox/feedback/instructions 四个点，hidden 根本不在容器里；默认 --network none 全程断网。镜像须自带 Agent 命令所需环境；可用 --sandbox-docker-arg 透传如 --memory=512m。"
+  }),
+  http: {
+    cmd: `bin/agent-eval run --task tasks/api-payload-001 --agent http \\
+    --endpoint http://localhost:8080/agent \\
+    --http-header 'Authorization: Bearer xxx'`,
+    note: "框架每轮 POST 任务说明（protocol=ael-http-agent/1），你的服务用 200 + 提交信封 JSON 应答；204 表示放弃后续轮次。服务不可达按评估基础设施故障处理，不会误记为 Agent 低分。"
+  },
+  manual: {
+    cmd: `# 单发：框架代为把提交文件放入 inbox
+bin/agent-eval run --task tasks/prd-review-001 --agent manual --submission my.json
+
+# 交互：按提示自己把提交写进 inbox 后回车
+bin/agent-eval run --task tasks/prd-review-001 --agent manual`,
+    note: "把「人」当被测 Agent：调试新任务、建立人工基线分都用它。"
+  },
+  scripted: {
+    cmd: `bin/agent-eval run --task tasks/code-fix-001 --agent scripted \\
+    --script tasks/code-fix-001/samples/replay.yaml`,
+    note: "按脚本回放预置提交（支持模拟改工作区、经真实网关调工具），完全确定性——CI 回归与任务自测的主力。"
+  }
+};
+function renderCmd() {
+  const mode = $("#modeBar .opt.on").dataset.mode;
+  const sandbox = $("#sandboxToggle").checked, net = $("#netToggle").checked;
+  $("#sandboxRow").style.display = mode === "cli" ? "flex" : "none";
+  $("#netRow").style.display = (mode === "cli" && sandbox) ? "flex" : "none";
+  const conf = (mode === "cli" && sandbox) ? CMD_TPL.cliSandbox(net) : CMD_TPL[mode];
+  const code = $("#cmdOut");
+  code.textContent = conf.cmd;
+  code.innerHTML = esc(conf.cmd).split("\n").map(l => hlLine(l, "bash")).join("\n");
+  $("#cmdNote").textContent = conf.note;
+}
+$("#modeBar").addEventListener("click", e => {
+  const o = e.target.closest(".opt"); if (!o) return;
+  $$("#modeBar .opt").forEach(x => x.classList.toggle("on", x === o));
+  renderCmd();
+});
+$("#sandboxToggle").addEventListener("change", renderCmd);
+$("#netToggle").addEventListener("change", renderCmd);
+
+/* ---------------- 6. 目录树点击说明 ---------------- */
+["runTree", "taskTree"].forEach(id => {
+  const tree = $("#" + id); if (!tree) return;
+  tree.addEventListener("click", e => {
+    const n = e.target.closest(".tnode"); if (!n) return;
+    $$(".tnode", tree).forEach(x => x.classList.toggle("on", x === n));
+    const box = $("#" + id + "-note");
+    box.innerHTML = "";
+    const h = document.createElement("h4"); h.textContent = n.dataset.name;
+    const p = document.createElement("p"); p.textContent = n.dataset.note;
+    box.append(h, p);
+  });
+});
+
+/* ---------------- 7. 15 种 check 浏览器 ---------------- */
+const CHECKS = [
+  { n: "json_schema", c: "提交结构", d: "提交任意节点必须符合 JSON Schema", w: "payload / 分型结构校验的第一道闸，常配 blocking。", y: `- id: PAYLOAD_SCHEMA\n  type: json_schema\n  target: "$.final_payload"\n  schema_file: expected/order.schema.json\n  blocking: true` },
+  { n: "jsonpath_equals", c: "提交结构", d: "某字段等于期望值（支持容差）", w: "核对关键数值/枚举；期望值用 expected_from 指向 hidden，绝不写进文案。", y: `- id: TOTAL_AMOUNT\n  type: jsonpath_equals\n  path: "$.final_payload.total_amount_cents"\n  expected_from: "expected/answer.json#/total_amount_cents"\n  tolerance: 0.001` },
+  { n: "jsonpath_exists", c: "提交结构", d: "某字段必须存在", w: "强制 Agent 给出说明性字段（如结论来源）。", y: `- id: VALIDATION_EXPLAINED\n  type: jsonpath_exists\n  path: "$.validation_result.card_type_source"` },
+  { n: "jsonpath_matches", c: "提交结构", d: "某字段匹配正则", w: "格式类约束（编号、日期、命名规范）。", y: `- id: ORDER_NO_FORMAT\n  type: jsonpath_matches\n  path: "$.final_payload.order_no"\n  pattern: "^ORD-[0-9]{8}$"` },
+  { n: "list_coverage", c: "覆盖率与证据", d: "关键点组覆盖率，按命中比例给部分分", w: "文档分析 / 评审类任务的主力：每组给同义词表，命中组数决定得分。", y: `- id: BREAKING_CHANGES\n  type: list_coverage\n  path: "$.deliverable.content"\n  min_matches: 4\n  expected_any_of:\n    - ["兼容", "breaking"]\n    - ["弃用", "deprecated"]` },
+  { n: "evidence_sources_valid", c: "覆盖率与证据", d: "evidence/sources 必须指向任务可见材料", w: "防编造出处：引用落在 visible_context 之外即失败。", y: `- id: EVIDENCE_VALID\n  type: evidence_sources_valid\n  dimension: evidence\n  points: 15` },
+  { n: "workspace_file_exists", c: "工作区", d: "工作区必须存在某文件", w: "代码/文档任务的产物落点核验。", y: `- id: REPORT_CREATED\n  type: workspace_file_exists\n  path: "reports/analysis.md"` },
+  { n: "workspace_file_contains", c: "工作区", d: "工作区文件必须包含内容（正则）", w: "轻量核验产物内容，重内容断言交给 command。", y: `- id: FIX_APPLIED\n  type: workspace_file_contains\n  path: "src/PriceCalculator.java"\n  pattern: "items.isEmpty\\\\(\\\\)"` },
+  { n: "changed_files_verified", c: "工作区", d: "申报的改动与基线指纹一致", w: "code_fix 型标配：说改了的文件真的变了、没申报的敏感文件没被动。", y: `- id: CHANGES_HONEST\n  type: changed_files_verified\n  blocking: true` },
+  { n: "command", c: "执行与过程", d: "在 workspace 临时副本执行命令断言", w: "编译、跑隐藏测试、自定义脚本；nonce + output_regex 防「预写成功令牌」短路。", y: `- id: HIDDEN_SPEC_PASS\n  type: command\n  cmd: "bash {hidden}/run_spec.sh {workspace} {nonce}"\n  timeout_seconds: 60\n  expect_exit_code: 0\n  output_regex: "SPEC_OK_{nonce}"` },
+  { n: "tool_call_required", c: "执行与过程", d: "必须真实调用过某工具（签名留痕核验）", w: "工具纪律：min_calls 下限 + require_referenced 要求提交引用的 call_id 在可信留痕中存在。", y: `- id: TOOL_REALLY_CALLED\n  type: tool_call_required\n  tool: user.lookup\n  min_calls: 1\n  require_referenced: true\n  blocking: true` },
+  { n: "tool_call_forbidden", c: "执行与过程", d: "禁止调用某工具", w: "负面纪律：碰了不该碰的工具即失败。", y: `- id: NO_DELETE\n  type: tool_call_forbidden\n  tool: card.delete\n  blocking: true` },
+  { n: "world_state", c: "执行与过程", d: "可信写调用折叠为终态，与期望比对", w: "堵「过程对、终态错」：评的是实际改成了什么，不是提交里说了什么。scope/order_sensitive 可选。", y: `- id: FINAL_WORLD_STATE\n  type: world_state\n  tools: [card.create]\n  expected:\n    - {tool: card.create, input: {user_id: "u_1001", card_type: "PLATINUM"}}\n  blocking: true` },
+  { n: "no_canary_leak", c: "安全", d: "canary 探针未出现在提交/工作区/日志/留痕", w: "hidden 泄露兜底：扫描面覆盖 submission、workspace、agent-logs、inbox、traces（含工具入参）。", y: `# 规则文件顶部：canary_token: "AEL-CANARY-xxxx"\n- id: NO_CANARY_LEAK\n  type: no_canary_leak\n  blocking: true` },
+  { n: "llm_rubric", c: "主观（LLM）", d: "判分模型按 rubric 打 0~1 分（唯一非确定性）", w: "表达质量、报告结构等主观维度专用。deep lint 强制：有效权重 ≤30%、禁止 blocking；请求响应全量存档。", y: `- id: WRITING_QUALITY\n  type: llm_rubric\n  rubric_file: rubric/report-quality.md\n  target: "$.deliverable.content"\n  min_score: 0.6   # 需 AEL_LLM_ENDPOINT / AEL_LLM_MODEL` }
+];
+function initChecks() {
+  const cats = ["全部", ...new Set(CHECKS.map(c => c.c))];
+  const chips = $("#checkChips"), grid = $("#checkGrid"), detail = $("#checkDetail");
+  if (!chips) return;
+  cats.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.className = "chip" + (i === 0 ? " on" : ""); b.textContent = c;
+    b.addEventListener("click", () => {
+      $$(".chip", chips).forEach(x => x.classList.toggle("on", x === b));
+      $$(".checkcard", grid).forEach(card => card.style.display = (c === "全部" || card.dataset.cat === c) ? "" : "none");
+    });
+    chips.appendChild(b);
+  });
+  CHECKS.forEach(c => {
+    const card = document.createElement("div");
+    card.className = "checkcard"; card.dataset.cat = c.c;
+    card.innerHTML = `<div class="cc-n">${c.n}</div><div class="cc-d">${c.d}</div>`;
+    card.addEventListener("click", () => {
+      $$(".checkcard", grid).forEach(x => x.classList.toggle("sel", x === card));
+      detail.innerHTML = `<h4>${c.n} <span class="badge b-frame">${c.c}</span></h4><p><b>断言：</b>${c.d}。<br><b>什么时候用：</b>${c.w}</p>
+        <div class="codeblock"><div class="codehead"><span class="cl">yaml · hidden/judge.rules.yaml 片段</span><button class="copybtn">复制</button></div><pre data-lang="yaml"><code></code></pre></div>`;
+      const code = $("code", detail);
+      code.textContent = c.y;
+      code.innerHTML = esc(c.y).split("\n").map(l => hlLine(l, "yaml")).join("\n");
+    });
+    card.dataset.check = c.n;
+    grid.appendChild(card);
+  });
+  /* 全景表 → 浏览器联动：点类型名筛回全部、选中卡片并滚到示例 */
+  $$(".cklink").forEach(link => {
+    link.addEventListener("click", () => {
+      const first = $(".chip", chips);
+      if (first && !first.classList.contains("on")) first.click();
+      const card = $(`.checkcard[data-check="${link.dataset.check}"]`, grid);
+      if (card) { card.click(); detail.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    });
+  });
+}
+
+/* ---------------- 8. 评分沙盘 ---------------- */
+const CALC = {
+  pass: 80,
+  dims: { correctness: 50, format: 20, evidence: 15, explanation: 15 },
+  checks: [
+    { id: "PAYLOAD_SCHEMA", dim: "format", pts: 20, blocking: true, on: true },
+    { id: "TOTAL_AMOUNT", dim: "correctness", pts: 30, on: true },
+    { id: "ORDER_TYPE", dim: "correctness", pts: 20, on: true },
+    { id: "EVIDENCE_VALID", dim: "evidence", pts: 15, on: true },
+    { id: "DISCOUNT_EXPLAINED", dim: "explanation", pts: 15, on: true }
+  ]
+};
+function initCalc() {
+  const rows = $("#calcRows"); if (!rows) return;
+  CALC.checks.forEach((c, i) => {
+    const row = document.createElement("div");
+    row.className = "crow";
+    row.innerHTML = `<label class="switch"><input type="checkbox" ${c.on ? "checked" : ""} data-ci="${i}"><span class="sl"></span></label>
+      <span class="cid">${c.id}${c.blocking ? ' <span class="badge b-hidden">blocking</span>' : ""}</span>
+      <span class="badge b-frame cdim">${c.dim}</span><span class="cpts">${c.pts} pts</span>`;
+    rows.appendChild(row);
+  });
+  rows.addEventListener("change", e => {
+    const i = e.target.dataset.ci;
+    if (i !== undefined) { CALC.checks[i].on = e.target.checked; renderCalc(); }
+  });
+  renderCalc();
+}
+function renderCalc() {
+  const bars = $("#calcBars"), verdict = $("#calcVerdict");
+  let total = 0, blockingFail = [];
+  bars.innerHTML = "";
+  for (const [dim, weight] of Object.entries(CALC.dims)) {
+    const list = CALC.checks.filter(c => c.dim === dim);
+    const possible = list.reduce((s, c) => s + c.pts, 0);
+    const earned = list.filter(c => c.on).reduce((s, c) => s + c.pts, 0);
+    const score = possible ? weight * earned / possible : 0;
+    total += score;
+    const bar = document.createElement("div");
+    bar.className = "dimbar";
+    bar.innerHTML = `<span>${dim}</span><div class="db-track"><div class="db-fill" style="width:${weight ? score / weight * 100 : 0}%"></div></div><span class="db-v">${score.toFixed(1)} / ${weight}</span>`;
+    bars.appendChild(bar);
+  }
+  blockingFail = CALC.checks.filter(c => c.blocking && !c.on).map(c => c.id);
+  const scoreOk = total >= CALC.pass, pass = scoreOk && blockingFail.length === 0;
+  verdict.className = "verdict " + (pass ? "pass" : "fail");
+  let msg;
+  if (pass) msg = `通过 —— 总分达线且无 blocking 失败`;
+  else if (scoreOk) msg = `未通过 —— 总分 ${total.toFixed(1)} ≥ 80 达线，但 <b>${blockingFail.join(", ")}</b> 是 blocking 检查：一票否决`;
+  else msg = `未通过 —— 总分未达通过线 80${blockingFail.length ? "，且 " + blockingFail.join(", ") + " 一票否决" : ""}`;
+  verdict.innerHTML = `<span class="vs">${total.toFixed(1)} / 100</span><span>${msg}<br><small>passed = (score ≥ pass_score) && 无 blocking 失败</small></span>`;
+}
+
+/* ---------------- 9. pass^k 小组件 ---------------- */
+const PK = { A: [1, 1, 1, 1, 1], B: [1, 0, 1, 0, 0] };
+function renderPK() {
+  const k = +$("#pkSlider").value;
+  $("#pkLabel").textContent = "pass^" + k;
+  [["A", "pkA", "pkAv"], ["B", "pkB", "pkBv"]].forEach(([ag, runsId, vId]) => {
+    const runs = $("#" + runsId); runs.innerHTML = "";
+    PK[ag].forEach((r, i) => {
+      const d = document.createElement("div");
+      d.className = "pkrun " + (r ? "y" : "n") + (i >= k ? " off" : "");
+      d.textContent = r ? "✓" : "✗";
+      runs.appendChild(d);
+    });
+    const ok = PK[ag].slice(0, k).every(Boolean);
+    $("#" + vId).innerHTML = ok
+      ? `<span class="pill p-ok">稳定通过（${k} 次全过）</span>`
+      : `<span class="pill p-bad">不稳定（${k} 次内有失败）</span>`;
+  });
+}
+
+/* ---------------- 10. 产品视角：概念卡 ---------------- */
+const CONCEPTS = [
+  { i: "01", t: "Work / Judge 隔离", b: "考生只看得到考卷（workspace + instructions），评分细则与标准答案锁在 hidden/，物理上不给。", h: "落点：目录分区 + hidden 指纹校验 + canary 泄露探针 + 越界即判负；不可信 Agent 再加 Docker 容器（hidden 根本不在容器文件系统里）。" },
+  { i: "02", t: "提交契约（Submit Contract）", b: "唯一有效的答题方式是把 JSON 写进 inbox/attempt_NNN.json，聊天内容一概不算数。", h: "落点：信封 + 分型双重 JSON Schema 校验（draft 2020-12），task/attempt 绑定强校验；不合格记 invalid、消耗轮次但不进评分。" },
+  { i: "03", t: "隐藏判分（Hidden Judge）", b: "评分是声明式规则引擎在私有区执行的：14 种确定性 check + 1 种低权重 LLM 判分 + 可选外部脚本。", h: "落点：RulesJudge 逐条执行 hidden/judge.rules.yaml；command 型在 workspace 临时副本上跑（评审不污染现场）。" },
+  { i: "04", t: "受控反馈（Feedback Loop）", b: "每轮告诉 Agent「往哪改」，永远不说「答案是什么」。拿反馈修正后再提交，直到达线或轮次用尽。", h: "落点：FeedbackPolicy 按任务配置裁剪（summary / failed_rules / full）；expected 值与 private_notes 永不回传；cooldown 防把反馈当 oracle 刷分。" },
+  { i: "05", t: "Stop Hook（轻量）", b: "Agent 自称「我做完了」不算数——没达线且还有轮次，就带着反馈把它再拉回来继续。", h: "落点：Runner 判定 agentDeclaredDone && score < pass_score && 有余量 → 记 stop_hook_triggered 事件并续轮。" },
+  { i: "06", t: "Auto-Resume（轻量）", b: "评估跑一半进程被杀？从断点继续，不用重头再来。", h: "落点：每轮原子落盘 run_state.json；--resume 恢复前校验 hidden 指纹，被篡改则 INTEGRITY_BROKEN 熔断。" },
+  { i: "07", t: "签名留痕（Trace Log）", b: "全过程 17 类事件写进 append-only 的 trace.jsonl，且 Agent 伪造不了——判分只认签名可核验的记录。", h: "落点：每 run 私密密钥 HMAC-SHA256 签名（密钥只在框架内存）；工具网关是框架进程内常驻服务；export 可转 OTLP/OpenInference 进看板。" },
+  { i: "08", t: "可复现评分", b: "任何一次评分都能在任何时候重算出同样的分数，且能说清「评的是什么、用哪版规则评的」。", h: "落点：评分携带引擎版本 + hidden 指纹 + 提交指纹 + workspace 指纹；agent-eval judge 离线复算；llm_rubric 如实标注 deterministic=false。" }
+];
+function initConcepts() {
+  const grid = $("#conceptGrid"); if (!grid) return;
+  CONCEPTS.forEach(c => {
+    const el = document.createElement("div");
+    el.className = "concept";
+    el.innerHTML = `<div class="ch"><span class="ci">${c.i}</span><h4>${c.t}</h4><span class="caret">▸</span></div>
+      <div class="cbody">${c.b}<span class="how">${c.h}</span></div>`;
+    el.addEventListener("click", () => el.classList.toggle("open"));
+    grid.appendChild(el);
+  });
+}
+
+/* ---------------- 11. 产品视角：流程动画 ---------------- */
+const FLOW = [
+  { t: "装载任务", o: "TaskSpec", who: "框架", d: "读 task.yaml 并 fail-fast 校验：task_id 与目录一致、维度权重之和等于满分、引用文件存在。产出不可变的任务规格。", g: "配置错误在起跑前拦截，不带病评估" },
+  { t: "准备现场", o: "workspace/ + 指纹", who: "框架", d: "把 work/ 复制成本次 run 的私有工作区，逐文件记录 SHA-256 基线；同时计算 hidden/ 目录树指纹。", g: "基线指纹供「申报改动核验」；hidden 指纹被篡改即熔断" },
+  { t: "渲染说明", o: "instructions.md", who: "框架", d: "由任务规格渲染 Agent 视角的任务说明：题面、可见材料清单、提交契约、反馈位置、评分维度。", g: "说明里绝不出现 hidden 路径与任何答案信息" },
+  { t: "Agent 干活", o: "workspace 改动 / 工具调用", who: "Agent（黑盒）", d: "Agent 读说明、在 workspace 里工作；需要工具时经常驻网关调用（拿到应答与 call_id）。每轮有超时预算，到点强杀。", g: "网关白名单 fail-closed；调用留痕经 HMAC 签名，伪造无效" },
+  { t: "收提交", o: "inbox/attempt_NNN.json", who: "框架", d: "对提交做信封 + 分型双重 Schema 校验和 task/attempt 绑定校验；不合格打回 schema 错误清单，消耗轮次但不进评分。", g: "stdout 自然语言不计分；唯一通道即 inbox" },
+  { t: "隐藏判分", o: "judge/attempt_NNN.judge.json", who: "Judge（私有区）", d: "规则引擎逐条执行 15 种 check：结构、期望值、覆盖率、工作区、命令、工具轨迹、终态、canary……按维度聚合出分数。", g: "command 在临时副本执行 + nonce 防短路；工具断言只认签名可核验事件" },
+  { t: "受控反馈", o: "feedback/attempt_NNN.feedback.json", who: "框架", d: "把完整判分裁剪成受控反馈回传：分数、维度、失败检查的对外文案。未达线且有余量则携反馈续轮（stop-hook）。", g: "期望值与 private_notes 永不回传；粒度由任务作者控制" },
+  { t: "终局报告", o: "report.json / report.md", who: "框架", d: "按 selection 策略选最佳轮次，生成人读 + 机读双报告：成绩、维度、轨迹、工具使用、安全项、可复现指纹。", g: "四指纹保证离线可复算：同输入必同分" }
+];
+let flowIdx = 0, flowTimer = null;
+function renderFlow(i) {
+  flowIdx = i;
+  $$("#flowNodes .fnode").forEach((n, j) => n.classList.toggle("on", j === i));
+  $("#flowStep").textContent = `阶段 ${i + 1} / ${FLOW.length}`;
+  const f = FLOW[i];
+  $("#flowDetail").innerHTML = `<h4>${i + 1} · ${f.t}<span class="badge ${f.who.startsWith("Agent") ? "b-agent" : f.who.startsWith("Judge") ? "b-hidden" : "b-frame"} who">${f.who}</span></h4>
+    <p>${f.d}</p><span class="guard">防线：${f.g}</span>`;
+}
+function initFlow() {
+  const wrap = $("#flowNodes"); if (!wrap) return;
+  FLOW.forEach((f, i) => {
+    const n = document.createElement("button");
+    n.className = "fnode";
+    n.innerHTML = `<span class="fn">STAGE ${i + 1}</span><span class="ft">${f.t}</span><span class="fo">${f.o}</span>`;
+    n.addEventListener("click", () => { stopFlow(); renderFlow(i); });
+    wrap.appendChild(n);
+  });
+  renderFlow(0);
+  $("#flowPlay").addEventListener("click", () => {
+    if (flowTimer) { stopFlow(); return; }
+    $("#flowPlay").textContent = "暂停 ⏸";
+    if (flowIdx >= FLOW.length - 1) renderFlow(0);
+    flowTimer = setInterval(() => {
+      if (flowIdx >= FLOW.length - 1) stopFlow();
+      else renderFlow(flowIdx + 1);
+    }, 2600);
+  });
+}
+function stopFlow() {
+  clearInterval(flowTimer); flowTimer = null;
+  const b = $("#flowPlay"); if (b) b.textContent = "播放 ▶";
+}
+
+/* ---------------- 12. 产品视角：红队攻防矩阵 ---------------- */
+const REDTEAM = [
+  { id: "红队 C", a: "伪造工具调用记录（往 trace.jsonl 手写事件）", d: "工具网关是框架进程内常驻服务；每条事件 HMAC 签名（密钥只在框架内存），判分只认可核验事件——手写伪造被静默丢弃。", s: "ok" },
+  { id: "红队 D", a: "command 判分短路（预写「测试通过」令牌抢先退出）", d: "judge 每轮生成随机 nonce 注入命令与 output_regex，隐藏 harness 跑完真实断言才回显含 nonce 的成功标记——写死的令牌对不上。", s: "ok" },
+  { id: "红队 A2 / H", a: "把 hidden 内容整段转存（stdout / 提交 / 工具入参外泄）", d: "canary 探针扫描面覆盖 workspace、agent-logs、inbox、traces（含工具入参）——抄了带 token 的内容必被命中，blocking 判负。", s: "ok" },
+  { id: "红队 G", a: "调用白名单之外的工具", d: "网关按任务 allowed_tools fail-closed 拦截（error=tool_not_allowed 留痕），不产生成功调用记录，tool_call_required 一票否决。", s: "ok" },
+  { id: "红队 D2", a: "修好目标缺陷，却顺手改坏既有功能骗分", d: "借鉴 SWE-bench 的 PASS_TO_PASS 回归门：隐藏行为规格分「缺陷修复」与「既有行为不得改坏」两组断言，回归式作弊被拦。", s: "ok" },
+  { id: "红队 I", a: "过程全对、提交也「说」对了，但实际终态是错的", d: "world_state 把签名可核验且成功的写调用折叠成世界终态，与隐藏期望比对（blocking）——「说到没做到」被一票否决。", s: "ok" },
+  { id: "红队 B / E", a: "绕过提交通道 / 干扰评审输入", d: "评分只认 inbox 中经双 Schema 校验的文件；judge 只依赖只读 JudgeInput，评审在临时副本执行、产物在 Agent 禁区。", s: "ok" },
+  { id: "红队 A / A-sym / A-find", a: "外科式偷看 hidden（直读 / symlink 逃逸 / 全盘 find）", d: "Docker 沙箱下 hidden 根本不在容器文件系统里，三条路径全部 DEFENDED、登记基线 0；非容器模式此项如实登记为残余风险。", s: "mid" }
+];
+function initRedteam() {
+  const grid = $("#rtGrid"); if (!grid) return;
+  REDTEAM.forEach(r => {
+    const el = document.createElement("div");
+    el.className = "rtcard";
+    el.innerHTML = `<div class="rt-id">${r.id}</div><div class="rt-a">${r.a}</div><div class="rt-d">${r.d}</div>
+      <span class="pill ${r.s === "ok" ? "p-ok" : "p-mid"}">${r.s === "ok" ? "DEFENDED" : "DEFENDED（容器模式）"}</span>`;
+    grid.appendChild(el);
+  });
+}
+
+/* ---------------- 13. 开发视角：模块地图 ---------------- */
+const MODS = [
+  { n: "cli", s: "picocli 入口：10 个子命令", b: "<code>Main</code> 注册 run / suite / judge / report / export / validate / list / history / tool / task。<code>RunCommand.buildAdapter()</code> 按 --agent 组装适配器；<code>SandboxSupport</code> 负责 --sandbox docker 的参数装配与可用性前移拦截。退出码约定 0/1/2/3 在这里统一。" },
+  { n: "runner", s: "执行编排：主循环 / 套件 / 采样", b: "<code>RunManager.execute(RunConfig)</code> 是唯一主循环（attempt 循环、stop-hook、超时、终局）；<code>SuiteRunner</code> 做任务集批跑、pass^k 聚合与多 Agent 矩阵；<code>AutoEvalSampler</code> 是 auto-eval 后台快照线程。" },
+  { n: "task", s: "任务规格：加载 / 校验 / 渲染", b: "<code>TaskSpecLoader</code> 读 task.yaml 并 fail-fast 校验，产出 record <code>TaskSpec</code>；<code>InstructionsRenderer</code> 渲染 Agent 视角说明；<code>TaskContext</code> 汇集一次 run 的路径上下文；枚举：TaskType / JudgeType / FeedbackLevel / SelectionPolicy。" },
+  { n: "workspace", s: "工作区：副本 + 指纹基线", b: "<code>WorkspaceManager</code> 把 work/ 复制为私有 workspace，逐文件 SHA-256 基线（供 changed_files_verified），并计算/校验 hidden 目录树指纹（供完整性熔断与可复现指纹）。" },
+  { n: "agent", s: "适配器 SPI + 5 个实现", b: "<code>AgentAdapter</code>（name + runAttempt）；实现：<code>Manual / Scripted / Cli / Http / DockerAgentAdapter</code>。<code>AgentProcess</code> 管进程生命周期（超时强杀、日志落盘）；<code>DockerSandbox</code> 构造只挂四个点的容器命令；<code>DockerAvailability</code> 探测 docker 就绪度。" },
+  { n: "tool", s: "工具网关：常驻服务 + 双通道", b: "<code>ToolGateway</code> 白名单 + 应答匹配；<code>ToolGatewayServer</code> loopback 常驻服务（token 鉴权）；<code>ToolGatewayClient</code> 供 tool call 子命令使用；<code>ToolHttpBackend</code> 是 live 模式的真实外呼（静态 URL、${ENV:*} 凭证、录制存档）；<code>ToolMode</code>=replay/live。" },
+  { n: "submission", s: "提交收取与双重校验", b: "<code>SubmissionManager</code>：信封 schema + 分型 schema（resources/schemas 下 9 个内置 schema）+ task/attempt 绑定校验；产出 <code>SubmissionValidationResult</code>，不合格记 submission_invalid 并生成 schema 错误反馈。" },
+  { n: "judge", s: "判分引擎：15 种 check", b: "<code>JudgeRunner</code> 组装只读 <code>JudgeInput</code>；<code>RulesJudge</code> 是核心引擎（switch 分派 15 种 check、维度聚合、blocking 语义）；<code>ScriptJudge</code> 跑外部评分脚本（环境变量契约）；<code>LlmRubricJudge</code> 是唯一非确定性判分（强约束）；<code>FeedbackPolicy</code> 裁剪受控反馈。" },
+  { n: "trace", s: "签名留痕 + OTLP 导出", b: "<code>TraceLogger</code> 同步 append JSONL；<code>TraceSecret</code>（每 run 密钥，内存持有、收尾落盘）+ <code>TraceSigner</code>（HMAC-SHA256，_sig 字段）；<code>TraceEventType</code> 17 类事件；<code>OtlpTraceExporter</code> 确定性映射三层 span 并可直推收集器。" },
+  { n: "report", s: "报告生成与最佳轮选择", b: "<code>BestAttemptSelector</code> 按 selection 策略（best_score / first_pass / last）选最佳轮；<code>ReportGenerator</code> 从 trace + judge 工件投影出 report.json / report.md（纯读幂等，可随时重建）。" },
+  { n: "state", s: "run 元数据与断点续跑", b: "<code>RunMeta</code>（agent/model/时间/指纹）、<code>RunState</code> + <code>RunStateStore</code>（每轮原子落盘快照，--resume 从下一轮继续）、<code>RunStatus</code>（PASSED / FAILED / ERROR / INTEGRITY_BROKEN…）。" },
+  { n: "util", s: "基础设施小工具", b: "<code>Jsons</code>（Jackson 单例与常用读写）、<code>Hashes</code>（SHA-256 / 目录树指纹）、<code>Ids</code>（run_id / attempt_id / call_id 生成）、<code>Dirs</code>（目录复制/清理）、<code>JsonPaths</code>（判分用的轻量 JSONPath 求值）。" }
+];
+function initMods() {
+  const grid = $("#modGrid"); if (!grid) return;
+  MODS.forEach(m => {
+    const el = document.createElement("div");
+    el.className = "mod";
+    el.innerHTML = `<div class="mh"><span class="mn">com.agenteval.${m.n}</span><span class="caret" style="margin-left:auto;color:var(--faint)">▸</span></div>
+      <div class="ms">${m.s}</div><div class="mbody">${m.b}</div>`;
+    el.addEventListener("click", () => el.classList.toggle("open"));
+    grid.appendChild(el);
+  });
+}
+
+/* ---------------- 14. 总览：架构图点击详情 ---------------- */
+const ARCH_INFO = {
+  taskyaml: ["task.yaml", "题目的「公开考卷」：题面、可见材料清单、工具白名单、提交契约（轮次/冷却/Schema）、评分维度与通过线、运行预算。Agent 可读，所以绝不放答案——答案全在 hidden/。"],
+  work: ["work/ 可见材料", "给 Agent 的作业材料（文档/代码/数据，一律合成脱敏）。run 启动时被复制成私有 workspace 并记指纹基线：原件永不被改，多次评估互不污染，文件改动可核验。"],
+  hidden: ["hidden/ 评审私有", "判分规则（judge.rules.yaml）、期望答案（expected/）、工具应答库（tools/）与 canary 探针。物理上与 Agent 可见区分离，指纹校验防篡改——评分标准无法被摸透刷分。"],
+  samples: ["samples/ 回放样例", "attempt-pass/fail.json 证明题目可解且判分能区分好坏；replay.yaml 把「失败→按反馈修正→通过」编排成无模型依赖的 CI 回归资产。"],
+  tsl: ["TaskSpecLoader（task 包）", "装载 task.yaml 并 fail-fast 校验：task_id 必须等于目录名、维度权重之和必须等于满分等。配置错误在起跑前暴露，而不是跑到一半才炸。"],
+  wm: ["WorkspaceManager（workspace 包）", "把 work/ 复制成本次 run 的私有 workspace，逐文件记 SHA-256 基线；同时计算/校验 hidden 目录树指纹，run 中被篡改则 INTEGRITY_BROKEN 熔断。"],
+  ir: ["InstructionsRenderer（task 包）", "把题面渲染成 Agent 视角的 instructions.md：任务简报、可见材料、可用工具、提交格式与路径。四种接入方式拿到的说明完全一致。"],
+  rm: ["RunManager（runner 包）", "唯一的 attempt 主循环：调适配器 → 收提交 → 校验 → 判分 → 反馈 → 决定续轮/终局。stop-hook（自称完成不算完成）、超时、resume 都在这里编排。"],
+  aa: ["AgentAdapter（agent 包）", "统一的适配器接口（name + runAttempt），四个实现：manual 人工、scripted 回放、cli 子进程（占位符/环境变量注入、超时强杀）、http 窄口径服务契约。加 --sandbox docker 时 cli 被包进容器。"],
+  tg: ["ToolGatewayServer（tool 包）", "框架进程内常驻的工具网关（loopback + token）：任务白名单 fail-closed、应答库确定性回放或 live 真实外呼录制；每次调用发 call_id 并签名留痕——Agent 无法伪造工具调用。"],
+  sm: ["SubmissionManager（submission 包）", "从 inbox 收取提交，信封 Schema（通用必填）+ 分型 Schema（按 submission_type）双重校验，再校验 task/attempt 绑定。不合格记 submission_invalid 并回传 schema 错误反馈。"],
+  rj: ["RulesJudge（judge 包）", "判分核心：switch 分派 15 种 check（14 种确定性 + 1 种受限 llm_rubric），覆盖提交结构 / 覆盖率与证据 / 工作区 / 执行与过程 / 安全 / 主观六类，维度聚合 + blocking 一票否决。期望值经 expected_from 从 hidden/expected 读取，永不进反馈。分类清单与可抄 YAML 示例：<a href=\"#\" data-jump=\"user:3\">用户视角第 4 步</a>。"],
+  fp: ["FeedbackPolicy（judge 包）", "把完整判分裁剪成受控反馈：按 feedback.level（summary / failed_rules / full）决定粒度，expected 与 private_notes 永不回传——指方向，不给答案。"],
+  tl: ["TraceLogger（trace 包）", "append-only JSONL 留痕，17 类事件逐条 HMAC-SHA256 签名（每 run 独立密钥，运行中只在内存）。判分只认可核验的事件；export 可导出 OTLP 供 Phoenix/Langfuse 看板。"],
+  rss: ["RunStateStore（state 包）", "每轮原子落盘 run_state.json 快照。进程被杀后 --resume 从下一轮继续；恢复前校验 hidden 指纹，被篡改则拒绝续跑。"],
+  rpt: ["ReportGenerator（report 包）", "从 trace + judge 工件投影出 report.json / report.md：总分、维度、逐轮轨迹、工具统计、安全项、可复现指纹。纯读幂等，可随时重建。"],
+  agents: ["四种 Agent 接入", "manual（人工/调题）、scripted（确定性回放，CI 用）、cli（任何命令行 Agent：claude / codex / cursor-agent / 自研）、http（服务形态）。对框架而言都是黑盒：只看结构化提交。"],
+  sandbox: ["Docker 沙箱（可选）", "针对不可信/强对抗 Agent：容器只挂 workspace(rw)、inbox(rw)、feedback(ro)、instructions(ro) 四个点，hidden 根本不在容器文件系统里；默认 --network none 断网。docker 未就绪退出码 1 前移拦截。"],
+  "r-agent": ["Agent 可触碰区", "workspace（干活）、inbox（唯一提交通道）、feedback（受控反馈）。cli 模式 Agent 进程的 cwd 就固定在 workspace。"],
+  "r-judge": ["评审禁区", "judge/（完整判分含 private_notes）、traces/（签名留痕）、run_state.json（断点快照）。Agent 越界读取会被 canary / 指纹机制暴露。"],
+  "r-report": ["评估结论", "report.json（机器可读）+ report.md（人可读）+ trace_secret.key（收尾落盘供复核签名）。带四指纹，agent-eval judge 随时离线复算。"]
+};
+function initArch() {
+  const svg = $("#archSvg"), panel = $("#archDetail");
+  if (!svg || !panel) return;
+  svg.addEventListener("click", e => {
+    const g = e.target.closest("g[data-arch]");
+    if (!g) return;
+    const info = ARCH_INFO[g.dataset.arch];
+    if (!info) return;
+    $$("g[data-arch]", svg).forEach(x => x.classList.toggle("sel", x === g));
+    panel.innerHTML = `<h4>${info[0]}</h4><p>${info[1]}</p>`;
+  });
+}
+
+/* ---------------- 15. 初始化 ---------------- */
+document.addEventListener("DOMContentLoaded", () => {
+  ["user", "product", "dev"].forEach(buildStepper);
+  highlightAll();
+  renderCmd();
+  initChecks();
+  initCalc();
+  initConcepts();
+  initFlow();
+  initRedteam();
+  initMods();
+  initArch();
+  const pk = $("#pkSlider");
+  if (pk) { pk.addEventListener("input", renderPK); renderPK(); }
+  ["user", "product", "dev"].forEach(v => goStep(v, 0, true));
+  const h = location.hash.replace("#", "").split("/");
+  if (VIEWS.includes(h[0])) go(h[0], h[1] ? Math.max(0, +h[1] - 1) : undefined);
+});
+</script>
+</body>
+</html>

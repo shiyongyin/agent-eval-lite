@@ -1,5 +1,7 @@
 target/
 runs/
+# 私有测评集的评估产物（集合本身入库，产物不入库）
+evalsets/*/runs/
 # 红队套件运行时生成的派生夹具（run_all.sh 每次重建，不入库）
 redteam/valid_api.json
 redteam/B-submission/b8_oversized.json
@@ -18,3 +20,9 @@ dependency-reduced-pom.xml
 .vscode/
 .specstory/
 .cursorindexingignore
+
+# Local secrets and machine-specific config
+.env
+.env.*
+!.env.example
+*.local

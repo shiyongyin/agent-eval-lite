@@ -1,0 +1,38 @@
+schema_version: 1
+task_id: llm-blocking-001
+task_name: 红队夹具·llm_rubric 设为 blocking（应被 validate 拒绝）
+task_type: generic
+tier: security
+labels: [redteam, llm-guardrail]
+description: >
+  红队夹具：即便 llm_rubric 权重合规（10%），只要把它标记为 blocking，
+  就等于允许非确定性信号一票否决。validate 深度 lint 必须拒绝该配置。
+agent_brief: 占位（本任务仅供红队 validate 断言，不用于真实评估）
+visible_context: []
+allowed_tools: []
+submit:
+  format: json
+  schema: builtin:generic
+  max_attempts: 1
+  cooldown_seconds: 0
+judge:
+  type: rules
+  rules_file: hidden/judge.rules.yaml
+  feedback:
+    level: failed_rules
+    include_scores: true
+scoring:
+  max_score: 100
+  pass_score: 80
+  selection: best_score
+  dimensions:
+    - name: correctness
+      weight: 90
+    - name: expression
+      weight: 10
+runtime:
+  timeout_minutes: 5
+  attempt_timeout_minutes: 5
+  allow_multi_submit: true
+  auto_eval_interval_seconds: 0
+  resume_enabled: true

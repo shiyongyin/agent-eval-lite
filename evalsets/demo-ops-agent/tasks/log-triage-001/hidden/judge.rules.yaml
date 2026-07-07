@@ -1,0 +1,34 @@
+# log-triage-001 隐藏评审规则（Agent 不可见）。
+# feedback_fail 是回传 Agent 的对外文案，禁止包含期望值本身。
+schema_version: 1
+judge_version: "0.1.0"
+
+checks:
+  - id: ERROR_COUNT_CORRECT
+    type: jsonpath_equals
+    dimension: correctness
+    points: 40
+    severity: critical
+    path: "$.answer.error_count"
+    expected_from: "expected/answer.json#/error_count"
+    feedback_fail: answer.error_count 不正确。注意统计口径：只数级别列为 ERROR 的行，消息文本里出现 "error" 字样的其他级别行不算
+
+  - id: TOP_CODE_CORRECT
+    type: jsonpath_equals
+    dimension: correctness
+    points: 30
+    severity: critical
+    path: "$.answer.top_error_code"
+    expected_from: "expected/answer.json#/top_error_code"
+    feedback_fail: answer.top_error_code 不正确。只统计 ERROR 行里的错误码，WARN/INFO 行中出现的错误码不计入
+
+  - id: SOURCE_CITED
+    type: list_coverage
+    dimension: explanation
+    points: 30
+    severity: low
+    path: "$.summary"
+    min_matches: 1
+    expected_any_of:
+      - ["service.log"]
+    feedback_fail: summary 未说明结论出处（应引用材料文件名）

@@ -1,0 +1,20 @@
+schema_version: 1
+judge_version: "0.1.0"
+# 红队夹具：expression 维度（权重 40）整段交给 llm_rubric，有效权重=40>30 上限，
+# validate 深度 lint 必须拒绝——非确定性 LLM 判分不允许承担高权重。
+checks:
+  - id: DET_CORRECT
+    type: jsonpath_exists
+    dimension: correctness
+    points: 60
+    path: "$.answer"
+    feedback_fail: 占位
+
+  - id: LLM_OVERWEIGHT
+    type: llm_rubric
+    dimension: expression
+    points: 40
+    rubric_file: rubric.md
+    target: "$.answer.report"
+    min_score: 0.6
+    feedback_fail: 占位

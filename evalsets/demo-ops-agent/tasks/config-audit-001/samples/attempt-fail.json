@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "task_id": "config-audit-001",
+  "attempt_id": "{attempt_id}",
+  "submission_type": "generic",
+  "summary": "扫了一遍 app.yaml，发现 debug 开着、TLS 关了，最要紧的是 debug（示例错误提交：漏了明文凭证、没对照基线级别、没引基线文档）",
+  "answer": { "violations": ["SEC-2", "SEC-5"], "most_critical": "SEC-2" },
+  "known_risks": [],
+  "needs_human_review": false
+}

@@ -129,11 +129,54 @@ public final class TaskSpecLoader {
                 runtimeNode.path("auto_eval_interval_seconds").asInt(0),
                 runtimeNode.path("resume_enabled").asBoolean(true));
 
+        TaskTier tier = parseTier(root, errors);
+        List<String> labels = parseLabels(root, errors);
+
         if (taskId == null || taskName == null || taskType == null || agentBrief == null || judgeType == null) {
             return null;
         }
         return new TaskSpec(schemaVersion, taskId, taskName, taskType, description, agentBrief,
-                visibleContext, allowedTools, submit, judge, scoring, runtime);
+                visibleContext, allowedTools, submit, judge, scoring, runtime, tier, labels);
+    }
+
+    /**
+     * 解析可选的任务分层：缺省即 {@link TaskTier#REGRESSION}；取值非法（不在枚举内）时记一条错误。
+     *
+     * @param root task.yaml 根节点
+     * @param errors 错误累加器
+     * @return 分层枚举（缺省 REGRESSION）
+     */
+    private static TaskTier parseTier(JsonNode root, List<String> errors) {
+        String value = root.path("tier").asText("");
+        if (value.isBlank()) {
+            return TaskTier.REGRESSION;
+        }
+        try {
+            return Enum.valueOf(TaskTier.class, value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            errors.add("字段 tier 取值非法: " + value + "（可选 smoke / regression / security / domain）");
+            return TaskTier.REGRESSION;
+        }
+    }
+
+    /**
+     * 解析可选的自由标签：逐项去空白，空白项记一条错误（避免 YAML 里出现空标签造成过滤歧义）。
+     *
+     * @param root task.yaml 根节点
+     * @param errors 错误累加器
+     * @return 标签列表（保持声明顺序）
+     */
+    private static List<String> parseLabels(JsonNode root, List<String> errors) {
+        List<String> labels = new ArrayList<>();
+        for (JsonNode item : root.path("labels")) {
+            String label = item.asText("").trim();
+            if (label.isEmpty()) {
+                errors.add("labels 中存在空标签");
+                continue;
+            }
+            labels.add(label);
+        }
+        return labels;
     }
 
     /**

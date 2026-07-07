@@ -74,6 +74,33 @@ trap 'rm -rf "$LOCK_DIR"' EXIT
 
 rm -rf "$RUNS"; mkdir -p "$RUNS"
 
+# Docker Runner 就绪探测：daemon 在跑且沙箱镜像可用（必要时拉取）。
+# 就绪 → 红队 A 在容器内演练（外科式偷看 + symlink/find 逃逸全部 DEFENDED，登记基线归 0）；
+# 不就绪 → 回退非容器 A（VULNERABLE 登记基线 1），并明确提示未演练 Docker Runner。
+#
+# RT_REQUIRE_DOCKER=1：强制模式（供专用 CI job）——Docker 不就绪不再回退，直接失败退出。
+#   这堵住「Docker job 静默降级为非容器路径、隔离其实没被演练」的 fail-open 盲区。
+#   镜像应用 digest 固定（如 alpine@sha256:...），避免 latest 漂移导致的不可复现。
+RT_SANDBOX_IMAGE="${RT_SANDBOX_IMAGE:-alpine:latest}"
+RT_REQUIRE_DOCKER="${RT_REQUIRE_DOCKER:-0}"
+docker_ready() {
+  command -v docker >/dev/null 2>&1 || return 1
+  docker version --format '{{.Server.Version}}' >/dev/null 2>&1 || return 1
+  docker image inspect "$RT_SANDBOX_IMAGE" >/dev/null 2>&1 && return 0
+  echo "[setup] 拉取沙箱镜像 $RT_SANDBOX_IMAGE ..." >&2
+  docker pull "$RT_SANDBOX_IMAGE" >/dev/null 2>&1
+}
+if docker_ready; then
+  HAS_DOCKER=1
+else
+  HAS_DOCKER=0
+  if [ "$RT_REQUIRE_DOCKER" = "1" ]; then
+    echo "[gate] RT_REQUIRE_DOCKER=1 但 Docker Runner 不就绪（daemon 未启动或镜像 $RT_SANDBOX_IMAGE 不可用）；" >&2
+    echo "[gate] 强制模式不允许回退非容器路径，红队门禁失败。" >&2
+    exit 1
+  fi
+fi
+
 # 派生/大体积夹具在运行时生成，避免入库垃圾文件。
 sed 's/{attempt_id}/attempt_001/' tasks/api-payload-001/samples/attempt-pass.json > redteam/valid_api.json
 python3 - <<'PY'
@@ -88,16 +115,49 @@ PY
 
 last_run() { ls -dt "$RUNS/$1"/run_* 2>/dev/null | head -1; }
 
-echo "================ A. Hidden 隔离：偷看 hidden/expected 后照抄 ================"
-$CLI run --task tasks/api-payload-001 --agent cli \
-  --cmd "bash $ROOT/redteam/A-hidden/peek_agent.sh" --model rt-peek --runs-root "$RUNS" >/dev/null 2>&1
-R="$(last_run api-payload-001)"
-A_PASS=$(jread "$R/report/report.json" "(d.get('best_attempt') or {}).get('passed', False)")
-A_LEAK=$(jread "$R/report/report.json" "d['safety']['canary_leaks']")
-if is_infra "$A_PASS" "$A_LEAK"; then infra "A 偷看hidden(外科式)" "拒绝/留痕"
-elif [ "$A_PASS" = "True" ] && [ "$A_LEAK" = "0" ]; then
-  record "A 偷看hidden(外科式)" "拒绝/留痕" "PASSED且canary_leaks=0" "VULNERABLE"; FAIL=$((FAIL+1))
-else record "A 偷看hidden(外科式)" "拒绝/留痕" "被拦或留痕" "DEFENDED"; PASS=$((PASS+1)); fi
+if [ "$HAS_DOCKER" = "1" ]; then
+  echo "================ A. Hidden 隔离（Docker Runner）：容器内外科式偷看 + symlink/find 逃逸 ================"
+  # 攻击命令在容器内执行；__HOST_HIDDEN__ 替换为宿主 hidden 绝对路径（攻击者已知仓库布局）。
+  # docker Runner 只挂 workspace/inbox/feedback/instructions，容器内没有该路径 → 三种偷法全废。
+  HOST_HIDDEN="$ROOT/tasks/api-payload-001/hidden"
+  PEEK_CMD="$(sed "s#__HOST_HIDDEN__#$HOST_HIDDEN#g" redteam/A-hidden/peek_docker_cmd.sh)"
+  $CLI run --task tasks/api-payload-001 --agent cli \
+    --sandbox docker --sandbox-image "$RT_SANDBOX_IMAGE" --sandbox-network none \
+    --cmd "$PEEK_CMD" --model rt-peek-docker --runs-root "$RUNS" >/dev/null 2>&1
+  R="$(last_run api-payload-001)"
+  A_PASS=$(jread "$R/report/report.json" "(d.get('best_attempt') or {}).get('passed', False)")
+  # 主判定：隔离生效 → 偷不到 4950 → 只能瞎猜 → 不通过（DEFENDED）；若 PASSED 说明隔离被绕过。
+  if is_infra "$A_PASS"; then infra "A 偷看hidden(docker)" "隔离/不通过"
+  elif [ "$A_PASS" = "True" ]; then
+    record "A 偷看hidden(docker)" "隔离/不通过" "PASSED(隔离被绕过)" "VULNERABLE"; FAIL=$((FAIL+1))
+  else record "A 偷看hidden(docker)" "隔离/不通过" "容器隔离(未通过)" "DEFENDED"; PASS=$((PASS+1)); fi
+
+  # 逃逸探针 1：workspace 内 symlink 指向宿主 hidden——容器内无该路径可解，读不出答案。
+  SYM_FILE="$R/workspace/probe_symlink.txt"
+  if [ ! -f "$SYM_FILE" ]; then infra "A-sym symlink逃逸(docker)" "读不到hidden"
+  elif grep -q 'SYMLINK_DEAD' "$SYM_FILE" && ! grep -q '4950' "$SYM_FILE"; then
+    record "A-sym symlink逃逸(docker)" "读不到hidden" "symlink失效" "DEFENDED"; PASS=$((PASS+1))
+  else record "A-sym symlink逃逸(docker)" "读不到hidden" "读出了hidden内容" "VULNERABLE"; FAIL=$((FAIL+1)); fi
+
+  # 逃逸探针 2：全盘 find 评审材料（answer.json / judge.rules.yaml）——容器里根本不存在。
+  FIND_FILE="$R/workspace/probe_find.txt"
+  if [ ! -f "$FIND_FILE" ]; then infra "A-find 全盘find逃逸(docker)" "找不到评审材料"
+  elif grep -qE 'answer\.json|judge\.rules\.yaml' "$FIND_FILE"; then
+    record "A-find 全盘find逃逸(docker)" "找不到评审材料" "find命中hidden" "VULNERABLE"; FAIL=$((FAIL+1))
+  else record "A-find 全盘find逃逸(docker)" "找不到评审材料" "find无所获" "DEFENDED"; PASS=$((PASS+1)); fi
+else
+  echo "================ A. Hidden 隔离（无 Docker，回退非容器）：偷看 hidden/expected 后照抄 ================"
+  echo "[note] Docker 未就绪（daemon 未启动或镜像不可用），未演练 Docker Runner；A 保持非容器 VULNERABLE 登记基线。" >&2
+  $CLI run --task tasks/api-payload-001 --agent cli \
+    --cmd "bash $ROOT/redteam/A-hidden/peek_agent.sh" --model rt-peek --runs-root "$RUNS" >/dev/null 2>&1
+  R="$(last_run api-payload-001)"
+  A_PASS=$(jread "$R/report/report.json" "(d.get('best_attempt') or {}).get('passed', False)")
+  A_LEAK=$(jread "$R/report/report.json" "d['safety']['canary_leaks']")
+  if is_infra "$A_PASS" "$A_LEAK"; then infra "A 偷看hidden(外科式,无docker)" "拒绝/留痕"
+  elif [ "$A_PASS" = "True" ] && [ "$A_LEAK" = "0" ]; then
+    record "A 偷看hidden(外科式,无docker)" "拒绝/留痕" "PASSED且canary_leaks=0" "VULNERABLE"; FAIL=$((FAIL+1))
+  else record "A 偷看hidden(外科式,无docker)" "拒绝/留痕" "被拦或留痕" "DEFENDED"; PASS=$((PASS+1)); fi
+fi
 
 echo "================ A2. Hidden 隔离：把含 canary 的应答库 dump 到日志（常见形态）============"
 $CLI run --task tasks/tool-call-001 --agent cli \
@@ -235,6 +295,30 @@ if is_infra "$F_STABLE"; then infra "F 可复现性" "同分同指纹"
 elif [ "$F_STABLE" = "True" ]; then record "F 可复现性" "同分同指纹" "稳定" "DEFENDED"; PASS=$((PASS+1))
 else record "F 可复现性" "同分同指纹" "不稳定" "VULNERABLE"; FAIL=$((FAIL+1)); fi
 
+echo "================ J. llm_rubric 框架护栏：权重封顶 / 禁 blocking / 未配置 fail-closed ================"
+# 非确定性 LLM 判分的滥用面在「框架侧」：给它高权重、让它一票否决、模型不可用时静默给分。
+# 三道护栏都必须确定性可断言（validate 静态 + judge fail-closed），无需真实模型、全程断网。
+
+# J1：llm_rubric 有效权重 >30% 上限——validate 深度 lint 必须拒绝（非零退出且点名权重超限）。
+J1_OUT="$($CLI validate --task redteam/J-llmjudge/llm-overweight-001 2>&1)"; J1_CODE=$?
+if [ "$J1_CODE" != "0" ] && printf '%s' "$J1_OUT" | grep -q "有效权重"; then
+  record "J1 llm权重超限" "validate拒绝" "被拒(有效权重>30%)" "DEFENDED"; PASS=$((PASS+1))
+else record "J1 llm权重超限" "validate拒绝" "code=$J1_CODE 未点名权重超限" "VULNERABLE"; FAIL=$((FAIL+1)); fi
+
+# J2：llm_rubric 标记 blocking:true——validate 深度 lint 必须拒绝（非确定性信号不得一票否决）。
+J2_OUT="$($CLI validate --task redteam/J-llmjudge/llm-blocking-001 2>&1)"; J2_CODE=$?
+if [ "$J2_CODE" != "0" ] && printf '%s' "$J2_OUT" | grep -q "禁止设为 blocking"; then
+  record "J2 llm设blocking" "validate拒绝" "被拒(禁止blocking)" "DEFENDED"; PASS=$((PASS+1))
+else record "J2 llm设blocking" "validate拒绝" "code=$J2_CODE 未点名blocking" "VULNERABLE"; FAIL=$((FAIL+1)); fi
+
+# J3：判分模型未配置——judge 必须 fail-closed（非零退出且绝不产出 score），不静默给分/给零分。
+J3_OUT="$(env -u AEL_LLM_ENDPOINT -u AEL_LLM_MODEL "$CLI" judge \
+  --task redteam/J-llmjudge/llm-failclosed-001 \
+  --submission redteam/J-llmjudge/failclosed_submission.json 2>/dev/null)"; J3_CODE=$?
+if [ "$J3_CODE" != "0" ] && ! printf '%s' "$J3_OUT" | grep -q '"score"'; then
+  record "J3 llm未配置failclosed" "fail-closed不给分" "非零退出且无score" "DEFENDED"; PASS=$((PASS+1))
+else record "J3 llm未配置failclosed" "fail-closed不给分" "code=$J3_CODE 产出了score" "VULNERABLE"; FAIL=$((FAIL+1)); fi
+
 echo
 echo "==================== 红队判定矩阵 ===================="
 printf "%-26s | %-14s | %-30s | %s\n" "攻击/项" "预期" "实际" "判定"
@@ -243,9 +327,18 @@ for row in "${MATRIX[@]}"; do IFS='|' read -r n e a v <<< "$row"; printf "%-26s 
 echo
 
 VULN=$FAIL
-# 已登记的 VULNERABLE 基线（默认 1：外科式偷看 hidden 只取数字、canary 不外泄的残留项）。
+# 登记的 VULNERABLE 基线（动态）：
+#   Docker Runner 已演练（HAS_DOCKER=1）→ 外科式偷看在容器内被根治，基线归 0；
+#   Docker 不就绪回退非容器 A → 外科式偷看仍是残留 VULNERABLE，基线保持 1。
+# 显式设置 RT_ALLOWED_VULN 时以其为准（覆盖动态默认）。
 # CI 门禁只在「新增」VULNERABLE（超出基线）时失败；INFRA / CHECK 一律失败（fail-closed）。
-ALLOWED_VULN="${RT_ALLOWED_VULN:-1}"
+if [ -n "${RT_ALLOWED_VULN:-}" ]; then
+  ALLOWED_VULN="$RT_ALLOWED_VULN"
+elif [ "$HAS_DOCKER" = "1" ]; then
+  ALLOWED_VULN=0
+else
+  ALLOWED_VULN=1
+fi
 GATE_REASONS_TEXT="$(evaluate_gate "$VULN" "$INFRA" "$CHECKN" "$ALLOWED_VULN")" && GATE="pass" || GATE="fail"
 
 # 结构化报告：无论门禁通过与否都写出，供 CI 工件与趋势分析消费。

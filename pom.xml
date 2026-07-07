@@ -9,6 +9,15 @@
     <version>0.1.0</version>
     <name>AgentEval-Lite</name>
     <description>轻量级通用 AI Agent 评估框架：TaskSpec + Work/Hidden 隔离 + 结构化提交 + 隐藏 Judge + Trace + Report</description>
+    <inceptionYear>2026</inceptionYear>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
@@ -33,7 +42,7 @@
             <artifactId>picocli</artifactId>
             <version>${picocli.version}</version>
         </dependency>
-        <!-- JSON / YAML：与 agentScopeScaffold 相同的 Jackson 生态 -->
+        <!-- JSON / YAML：任务规格、提交、报告和 trace 的结构化数据基础 -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>

@@ -1,5 +1,6 @@
 package com.agenteval.cli;
 
+import com.agenteval.judge.JudgeException;
 import com.agenteval.judge.JudgeInput;
 import com.agenteval.judge.JudgeResult;
 import com.agenteval.judge.JudgeRunner;
@@ -81,6 +82,11 @@ public final class JudgeCommand implements Callable<Integer> {
                 System.out.println(json);
             }
             return 0;
+        } catch (JudgeException e) {
+            // 评审设施故障（如 llm_rubric 判分模型未配置）：fail-closed——不产出任何分数，
+            // 以框架故障退出码结束，绝不静默给分/给零分。
+            System.err.println("评审设施故障，未产出分数（fail-closed）: " + e.getMessage());
+            return 2;
         } finally {
             if (tempWorkspace != null) {
                 Dirs.deleteTree(tempWorkspace);

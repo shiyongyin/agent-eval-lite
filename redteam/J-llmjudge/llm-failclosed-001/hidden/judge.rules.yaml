@@ -1,0 +1,19 @@
+schema_version: 1
+judge_version: "0.1.0"
+# 红队夹具：合规配置（llm_rubric 权重 10%、非 blocking）。未配置判分模型时 judge 必须 fail-closed。
+checks:
+  - id: DET_CORRECT
+    type: jsonpath_exists
+    dimension: correctness
+    points: 90
+    path: "$.answer"
+    feedback_fail: 占位
+
+  - id: LLM_PROSE
+    type: llm_rubric
+    dimension: expression
+    points: 10
+    rubric_file: rubric.md
+    target: "$.answer.report"
+    min_score: 0.6
+    feedback_fail: 占位

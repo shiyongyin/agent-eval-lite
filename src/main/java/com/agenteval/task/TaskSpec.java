@@ -22,6 +22,8 @@ import java.util.Map;
  * @param judge 评审配置
  * @param scoring 计分配置
  * @param runtime 运行时预算配置
+ * @param tier 任务分层（批跑意图元数据，供 {@code suite --tier} 过滤；不影响判分）
+ * @param labels 自由标签（便于人工检索与筛选；不影响判分）
  * @author shiyongyin
  * @since 0.1.0
  */
@@ -37,11 +39,41 @@ public record TaskSpec(
         Submit submit,
         JudgeSpec judge,
         Scoring scoring,
-        RuntimeSpec runtime) {
+        RuntimeSpec runtime,
+        TaskTier tier,
+        List<String> labels) {
 
     public TaskSpec {
         visibleContext = visibleContext == null ? List.of() : List.copyOf(visibleContext);
         allowedTools = allowedTools == null ? List.of() : List.copyOf(allowedTools);
+        tier = tier == null ? TaskTier.REGRESSION : tier;
+        labels = labels == null ? List.of() : List.copyOf(labels);
+    }
+
+    /**
+     * 兼容构造器：未声明分层元数据的历史调用方沿用旧签名，分层默认
+     * {@link TaskTier#REGRESSION}、标签为空。
+     *
+     * @param schemaVersion 规格 schema 版本
+     * @param taskId 任务唯一标识
+     * @param taskName 人类可读任务名
+     * @param taskType 任务类型
+     * @param description 评估者视角背景
+     * @param agentBrief 渲染给 Agent 的任务陈述
+     * @param visibleContext 可读文件清单
+     * @param allowedTools 允许的工具
+     * @param submit 提交契约配置
+     * @param judge 评审配置
+     * @param scoring 计分配置
+     * @param runtime 运行时预算配置
+     */
+    public TaskSpec(int schemaVersion, String taskId, String taskName, TaskType taskType,
+                    String description, String agentBrief, List<String> visibleContext,
+                    List<AllowedTool> allowedTools, Submit submit, JudgeSpec judge,
+                    Scoring scoring, RuntimeSpec runtime) {
+        this(schemaVersion, taskId, taskName, taskType, description, agentBrief,
+                visibleContext, allowedTools, submit, judge, scoring, runtime,
+                TaskTier.REGRESSION, List.of());
     }
 
     /**

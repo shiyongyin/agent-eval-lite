@@ -1,0 +1,52 @@
+schema_version: 1
+task_id: log-triage-001
+task_name: 服务日志错误分诊
+task_type: generic
+tier: smoke
+labels: [ops, log-analysis]
+description: >
+  评估 Agent 的日志阅读与精确统计能力：材料里埋了两个陷阱——消息文本含 "error" 的 INFO 行、
+  含错误码的 WARN 行。只会全文 grep 关键字而不区分日志级别的 Agent 会数错。
+
+agent_brief: |
+  阅读工作区里的 `service.log`，完成错误分诊：
+
+  - 统计**级别为 ERROR** 的日志行数（以行首时间戳后的级别列为准，消息内容里出现
+    "error" 字样不算），把整数填入 `answer.error_count`；
+  - 找出 ERROR 行中出现次数最多的错误码（形如 `XXX-999`），填入 `answer.top_error_code`；
+  - 在 `summary` 里说明统计口径与结论出处（引用材料文件名）。
+
+visible_context:
+  - work/service.log
+
+allowed_tools: []
+
+submit:
+  format: json
+  schema: builtin:generic
+  max_attempts: 3
+  cooldown_seconds: 0
+
+judge:
+  type: rules
+  rules_file: hidden/judge.rules.yaml
+  feedback:
+    level: failed_rules
+    include_scores: true
+
+scoring:
+  max_score: 100
+  pass_score: 80
+  selection: best_score
+  dimensions:
+    - name: correctness
+      weight: 70
+    - name: explanation
+      weight: 30
+
+runtime:
+  timeout_minutes: 20
+  attempt_timeout_minutes: 5
+  allow_multi_submit: true
+  auto_eval_interval_seconds: 0
+  resume_enabled: true

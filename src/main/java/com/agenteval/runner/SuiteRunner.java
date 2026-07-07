@@ -2,6 +2,8 @@ package com.agenteval.runner;
 
 import com.agenteval.agent.AgentAdapter;
 import com.agenteval.agent.CliAgentAdapter;
+import com.agenteval.agent.DockerAgentAdapter;
+import com.agenteval.agent.DockerSandbox;
 import com.agenteval.agent.HttpAgentAdapter;
 import com.agenteval.agent.ScriptedAgentAdapter;
 import com.agenteval.state.RunStatus;
@@ -86,6 +88,19 @@ public final class SuiteRunner {
         public static AgentSpec cli(String label, String cmd) {
             return new AgentSpec(label == null || label.isBlank() ? "cli" : label, false,
                     taskDir -> new CliAgentAdapter(cmd));
+        }
+
+        /**
+         * Docker 沙箱 CLI Agent（容器强隔离批跑；契约见 {@link DockerAgentAdapter}）。
+         *
+         * @param label 标签（用于对比面板区分）
+         * @param cmd 命令模板（占位符替换为容器内路径）
+         * @param sandbox docker 沙箱配置
+         * @return 规格
+         */
+        public static AgentSpec dockerCli(String label, String cmd, DockerSandbox sandbox) {
+            return new AgentSpec(label == null || label.isBlank() ? "docker" : label, false,
+                    taskDir -> new DockerAgentAdapter(cmd, sandbox));
         }
 
         /**

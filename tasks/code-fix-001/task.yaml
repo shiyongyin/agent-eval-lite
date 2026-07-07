@@ -2,6 +2,8 @@ schema_version: 1
 task_id: code-fix-001
 task_name: 修复价格计算器的越界与空指针缺陷
 task_type: code_fix
+tier: smoke
+labels: [code-fix]
 description: >
   评估 Agent 在最小 Java 代码库上的缺陷修复能力：能否定位 off-by-one 与 null 处理问题、
   真实修改代码（而非只声称改了）、并如实申报自测情况。隐藏评审会在临时副本上编译并运行
