@@ -243,6 +243,26 @@ bin/agent-eval export --run runs/xxx/run_yyy
 
 更多细节见 [redteam/audit-report.md](redteam/audit-report.md) 和 [SECURITY.md](SECURITY.md)。
 
+## AI 协作 Skills
+
+仓库内置了项目级 skills，位置在 [.agents/skills](.agents/skills)。支持 Codex skills 的环境会原生发现；Claude Code 通过 [.claude/skills](.claude/skills) 符号链接复用同一套内容。
+
+这些 skills 不是运行时依赖，而是给 AI 编码助手的工作流说明。你可以在对话里直接点名，例如“用 `ael-build-evalset` 帮我把业务场景做成评测集”。
+
+| Skill | 什么时候用 | 主要产出 |
+| --- | --- | --- |
+| [`ael-build-evalset`](.agents/skills/ael-build-evalset/SKILL.md) | 从零建设私有测评集、接入真实 Agent、跑批量对比 | `evalsets/<set>/`、任务样例、`agents.yaml`、suite/history 命令 |
+| [`ael-new-task`](.agents/skills/ael-new-task/SKILL.md) | 新增或修改内置 `tasks/<task-id>/` 任务 | `task.yaml`、`work/`、`hidden/`、`samples/` 和 fail→pass 回放闭环 |
+| [`ael-analyze-results`](.agents/skills/ael-analyze-results/SKILL.md) | 评测跑完后分析 run/suite/history，定位为什么掉分或没过 | 基于 `report.json`、`suite_report.json`、trace 和 feedback 的证据化诊断 |
+| [`ael-verify`](.agents/skills/ael-verify/SKILL.md) | 改完代码、任务、红队或文档后选择验证闸 | 最便宜但足够证明正确性的验证命令组合 |
+
+推荐使用方式：
+
+- 要评估自己的 Agent：从 `ael-build-evalset` 开始，不要把私有业务任务混进内置 `tasks/`。
+- 要给框架新增内置题：用 `ael-new-task`，并严格检查 hidden 防泄露。
+- 已经有评测结果但不知道问题在哪：用 `ael-analyze-results`。
+- 准备提交前：用 `ael-verify` 选验证闸，再按需要跑 `bash bin/ci-smoke.sh`。
+
 ## 文档地图
 
 - [docs/05-交互式导览.html](docs/05-交互式导览.html)：用户、产品、开发三视角的单文件交互导览。
