@@ -602,6 +602,34 @@ details.acc .accbody p,details.acc .accbody li{font-size:13.8px;color:#cbd5e1}
         <div class="note"><span class="nt t-info">想看每个阶段的细节？</span>产品视角第 3 步有逐阶段可播放的运转动画（含每阶段的执行者与防作弊落点）。<a href="#" data-jump="product:2">直接跳过去 →</a></div>
       </div>
 
+      <!-- ===== 总览 · 项目亮点：传统工程 × AI 辅助 ===== -->
+      <div class="ovsec">
+        <h2><span class="ok">ENGINEERING × AI</span>项目亮点：确定性内核 × AI 辅助全流程</h2>
+        <p class="od">这是一个把<b>传统软件工程</b>与 <b>AI 编码助手</b>缝在一起的项目：<b>判分内核走传统路线</b>——单 jar、零外部服务、隐藏判分、HMAC 签名留痕、同输入必同分，不依赖任何模型或 API Key；<b>而围绕它的出题与运维可整条交给 AI</b>——建集 → 出题 → 审查 → 分析 → 验证全流程都能让 Codex / Claude Code 等 AI 助手代跑。职责一刀切清楚：AI 只加速「人」这一侧，评审内核绝不因此掺入任何不确定性。</p>
+        <div class="grid g2">
+          <div class="card tight">
+            <h4><span class="badge b-frame">传统底座</span>确定性 · 可复现 · 可审计</h4>
+            <p>Java 17 单 jar，零外部服务依赖；隐藏判分 + 17 类事件 HMAC 签名留痕 + 可复现指纹，<b>同输入必同分</b>，离线可复算。这一层刻意不引入 AI，保证评分本身可信、可回溯。</p>
+          </div>
+          <div class="card tight">
+            <h4><span class="badge b-agent">AI 协作层</span>整条链可交给 AI 助手代跑</h4>
+            <p>接入支持项目级 skills 的 AI 编码助手，直接在对话里点名，例如「用 <code>ael-build-evalset</code> 把业务场景做成评测集」。这些 skill 是给 AI 的<b>工作流说明</b>（<code>.agents/skills/</code>），不是运行时依赖——不装它框架照样跑。</p>
+          </div>
+        </div>
+        <div class="loopstrip" style="margin-top:6px">
+          <div class="lnode"><div class="ln">建集</div><div class="lt"><code>ael-build-evalset</code></div><div class="ld">从零搭建私有测评集、接入真实 Agent</div></div>
+          <div class="larrow">→</div>
+          <div class="lnode"><div class="ln">出题</div><div class="lt"><code>ael-new-task</code></div><div class="ld">生成 / 修改单个任务与判分规则</div></div>
+          <div class="larrow">→</div>
+          <div class="lnode"><div class="ln">审查</div><div class="lt"><code>ael-review-task-quality</code></div><div class="ld">进门禁前的独立质量审查</div></div>
+          <div class="larrow">→</div>
+          <div class="lnode"><div class="ln">分析</div><div class="lt"><code>ael-analyze-results</code></div><div class="ld">只读解读结果、定位掉分归因</div></div>
+          <div class="larrow">→</div>
+          <div class="lnode"><div class="ln">验证</div><div class="lt"><code>ael-verify</code></div><div class="ld">按改动范围选最省的验证闸</div></div>
+        </div>
+        <div class="note"><span class="nt t-info">想看每个 skill 具体怎么用？</span>「用户视角」第 4 步有 5 张 skill 职责卡片（做什么 / 何时点它）；完整清单见 <code>README.md</code> 的「AI 协作 Skills」与 <code>docs/06-小团队落地指南.md</code>。<a href="#" data-jump="user:3">直接跳过去 →</a></div>
+      </div>
+
       <div class="rolecards">
         <div class="rolecard" data-go="user">
           <div class="rc-ico">USER ▸ 评估者 / 出题人</div>
@@ -611,6 +639,7 @@ details.acc .accbody p,details.acc .accbody li{font-size:13.8px;color:#cbd5e1}
             <li>5 分钟跑通第一个评估</li>
             <li>四种接入方式 + Docker 沙箱（含命令生成器）</li>
             <li>建题五步法 + 15 种 check + 评分沙盘</li>
+            <li>用 AI 助手代跑建集 / 出题 / 审查全流程</li>
             <li>批跑、pass^k 可靠性、多 Agent 对比</li>
             <li>速查手册：FAQ · 命令表 · 常见坑 · 名词表</li>
           </ul>
