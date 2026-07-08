@@ -895,6 +895,16 @@ bin/agent-eval tool call user.lookup --input '{"user_id":"u_1001"}'
     <li><b>钉住闭环</b>：更新 <code>samples/attempt-pass.json</code> / <code>attempt-fail.json</code> + <code>replay.yaml</code>，用 scripted 跑通「第 1 轮失败 → 按反馈修正 → 第 2 轮通过」，这个闭环以后就是这道题的 CI 回归。</li>
   </ol>
 
+  <h3 class="sec">用 AI 助手代跑全流程（可选）</h3>
+  <p class="pdesc">接入 Codex / Claude Code 等支持项目级 skills 的 AI 编码助手，可把「建集 → 出题 → 审查 → 分析 → 验证」整条链交给它——这些 skill 是给 AI 的工作流说明，不是运行时依赖。直接在对话里点名即可，例如「用 <code>ael-build-evalset</code> 帮我把业务场景做成评测集」；完整清单见 <code>README.md</code> 的「AI 协作 Skills」与 <code>docs/06-小团队落地指南.md</code>。</p>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(212px,1fr))">
+    <div class="card tight"><h4><code>ael-build-evalset</code> <span class="badge b-frame">建集</span></h4><p><b>做什么：</b>从零搭建私有测评集、接入真实 Agent、跑批量对比。<br><b>何时点它：</b>「我要评估自己的 Agent」——产出 <code>evalsets/&lt;set&gt;/</code>、<code>agents.yaml</code> 与 suite/history 命令。</p></div>
+    <div class="card tight"><h4><code>ael-new-task</code> <span class="badge b-frame">出题</span></h4><p><b>做什么：</b>生成 / 修改单个任务（内置或私有集），含判分规则编写与离线快速迭代。<br><b>何时点它：</b>「加一道题 / 改 judge 规则」——产出 task.yaml、work/、hidden/、samples/ 与 fail→pass 闭环。</p></div>
+    <div class="card tight"><h4><code>ael-review-task-quality</code> <span class="badge b-frame">审查</span></h4><p><b>做什么：</b>任务进 smoke/regression 门禁前的独立质量审查。<br><b>何时点它：</b>「这题能不能进测评集」——查 hidden 防泄露、样例闭环、判分稳定性，给分层建议。</p></div>
+    <div class="card tight"><h4><code>ael-analyze-results</code> <span class="badge b-frame">分析</span></h4><p><b>做什么：</b>跑完后只读解读 run/suite/history，定位掉分归因。<br><b>何时点它：</b>「为什么没过 / 差在哪」——给出挂了哪条 rule、是能力还是接入契约问题，附可验证的改进方向。</p></div>
+    <div class="card tight"><h4><code>ael-verify</code> <span class="badge b-frame">验证</span></h4><p><b>做什么：</b>改完代码 / 任务 / 文档后，按改动范围选最便宜的验证闸。<br><b>何时点它：</b>「提交前检查」——从单测到 ci-smoke 给出够用但不过度的验证命令组合。</p></div>
+  </div>
+
   <h3 class="sec">任务目录契约（点击条目看说明）</h3>
   <div class="treewrap">
     <div class="tree" id="taskTree">
