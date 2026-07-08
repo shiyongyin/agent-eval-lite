@@ -27,26 +27,13 @@ evalsets/<set-name>/
 4. **被评 Agent 形态**：命令行（claude/codex/自研 CLI）→ `cli`；HTTP 服务→`http`；不可信/强对抗→`cli + --sandbox docker`。
 5. **规模与预算**：几个任务、每任务几轮（`max_attempts`）、要不要 `--repeat k` 可靠性口径。
 
-## 阶段 1：逐任务生成（每个任务都走完这五步再做下一个）
+## 阶段 1：逐任务生成（每个任务走完 `ael-new-task` 全流程再做下一个）
 
 ```bash
-bin/agent-eval evalset init --id <set-name>                         # 新集合先建骨架
-bin/agent-eval task init --id <task-id> --tasks-root evalsets/<set>/tasks   # 从能跑的脚手架开始
+bin/agent-eval evalset init --id <set-name>   # 新集合先建骨架（或复制 evalsets/_template/）
 ```
 
-1. 改 `task.yaml`：`agent_brief` 只描述任务与提交要求（禁夹带答案线索）；维度权重和 = `max_score`；`tier` 归类。
-2. 放真实材料进 `work/`；`visible_context` 列出（带 `work/` 前缀）。**好任务要有区分度**：在材料里布设「朴素做法会踩中的陷阱」（如干扰行、跨文件才能推出的结论），让能力差的 Agent 真的拿不到分——全员满分的任务度量不出任何东西。
-3. 写 `hidden/judge.rules.yaml`：期望值放 `hidden/expected/` 用 `expected_from` 引用；优先 `jsonpath_equals`（精确值）+ `list_coverage`（关键点覆盖，部分得分）；`feedback_fail` 只说哪里不对、禁含期望值。
-4. 重写 `samples/` 三件套：fail 样例要犯「真实 Agent 最可能犯的错」，replay.yaml 编排 fail→pass。
-5. 验证闭环（全绿才算一个任务完成）：
-
-```bash
-bin/agent-eval validate --task evalsets/<set>/tasks/<task-id>
-bin/agent-eval run --task evalsets/<set>/tasks/<task-id> --agent scripted \
-    --script evalsets/<set>/tasks/<task-id>/samples/replay.yaml --runs-root evalsets/<set>/runs
-```
-
-设计任务内容时逐条过 `tasks/AGENTS.md` 的 hidden 防泄露检查单。
+任务脚手架、task.yaml 硬约束、判分规则编写与快速迭代（离线 judge 对 samples 双侧验证）、samples 三件套、防泄露自查、验证闭环，全部按 `ael-new-task` 执行，不在此重复；命令一律带 `--tasks-root evalsets/<set>/tasks`，回放加 `--runs-root evalsets/<set>/runs`。建集阶段的额外要求只有一条：`work/` 必须放阶段 0 拿到的真实工作样本，不要编造材料。
 
 任务进入 smoke/regression 门禁前，再用 `ael-review-task-quality` 或 `docs/07-任务质量清单.md` 做质量审查；不要只因为 replay 能过就把任务放进硬门禁。
 
@@ -101,11 +88,7 @@ bin/agent-eval suite --tasks-root evalsets/<set>/tasks --runs-root evalsets/<set
 bin/agent-eval history --runs-root evalsets/<set>/runs
 ```
 
-`agents.yaml` 格式见 README「suite」一节。解读要点：
-
-- 多 Agent 横向对比看 suite 的对比面板（`suite_report.md`：小团队操作摘要、pass^k 稳定通过数、失败规则热点、平均耗时、自报成本）；
-- `history` 按 **(task_id, 适配器名)** 聚合——多个 cli Agent 会混进同一行 `cli`，它适合看单 Agent 的纵向趋势，横向选型请以 suite 对比报告为准；
-- 单任务掉分先看 `<run>/report/report.md` 的 failed checks 与 `<run>/feedback/`，再看 `<run>/agent-logs/`（Agent 到底输出了什么）。
+`agents.yaml` 格式见 README「suite」一节。多 Agent 横向对比看 suite 对比面板（`suite_report.md`：pass^k 稳定通过数、失败规则热点、平均耗时、自报成本）。跑完后的报告解读、掉分归因与优化建议整体切到 `ael-analyze-results`（history 聚合口径、`score:null` 语义、责任归属定性都在那边，不在此重复）。
 
 ## 常见失败排查
 
@@ -116,3 +99,5 @@ bin/agent-eval history --runs-root evalsets/<set>/runs
 | 退出码 2 | 框架/环境故障（如任务配置在 run 期才暴露的问题），看 stderr 与 `<run>/traces/trace.jsonl` 的 `error` 事件，别急着改 Agent |
 | 分数总差一个维度 | `hidden/judge.rules.yaml` 的 `feedback_fail` 提示（`<run>/feedback/`）；确认期望值与 `expected_from` 指针 |
 | 想复核判分 | `bin/agent-eval judge --task <taskDir> --submission <run>/inbox/attempt_NNN.json`（离线可复现） |
+
+本表只覆盖接线时的即时排查；跑完后的系统性归因（定性 → 证据链 → 分类建议）切到 `ael-analyze-results`。

@@ -45,4 +45,4 @@ bin/agent-eval history --runs-root evalsets/demo-ops-agent/runs
 
 ## 拿它当模板
 
-复制目录骨架后按 `.agents/skills/ael-build-evalset/SKILL.md` 的五阶段工作流替换内容；任务红线见 `tasks/AGENTS.md`（hidden 防泄露检查单同样适用于私有集）。
+复制目录骨架后按 `.agents/skills/ael-build-evalset/SKILL.md` 的分阶段工作流替换内容（单任务出题委托 `ael-new-task`）；任务红线见 `tasks/AGENTS.md`（hidden 防泄露检查单同样适用于私有集）。

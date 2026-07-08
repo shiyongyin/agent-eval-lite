@@ -314,7 +314,7 @@ bin/agent-eval export --run runs/xxx/run_yyy
 | Skill | 什么时候用 | 主要产出 |
 | --- | --- | --- |
 | [`ael-build-evalset`](.agents/skills/ael-build-evalset/SKILL.md) | 从零建设私有测评集、接入真实 Agent、跑批量对比 | `evalsets/<set>/`、任务样例、`agents.yaml`、suite/history 命令 |
-| [`ael-new-task`](.agents/skills/ael-new-task/SKILL.md) | 新增或修改内置 `tasks/<task-id>/` 任务 | `task.yaml`、`work/`、`hidden/`、`samples/` 和 fail→pass 回放闭环 |
+| [`ael-new-task`](.agents/skills/ael-new-task/SKILL.md) | 新增或修改单个任务（内置 `tasks/` 或私有 `evalsets/<set>/tasks/`） | `task.yaml`、`work/`、`hidden/`、`samples/` 和 fail→pass 回放闭环 |
 | [`ael-review-task-quality`](.agents/skills/ael-review-task-quality/SKILL.md) | 审查任务能否进入 smoke/regression 门禁 | hidden 防泄露检查、样例闭环、判分稳定性和分层建议 |
 | [`ael-analyze-results`](.agents/skills/ael-analyze-results/SKILL.md) | 评测跑完后分析 run/suite/history，定位为什么掉分或没过 | 基于 `report.json`、`suite_report.json`、trace 和 feedback 的证据化诊断 |
 | [`ael-verify`](.agents/skills/ael-verify/SKILL.md) | 改完代码、任务、红队或文档后选择验证闸 | 最便宜但足够证明正确性的验证命令组合 |
@@ -322,7 +322,7 @@ bin/agent-eval export --run runs/xxx/run_yyy
 推荐使用方式：
 
 - 要评估自己的 Agent：从 `ael-build-evalset` 开始，不要把私有业务任务混进内置 `tasks/`。
-- 要给框架新增内置题：用 `ael-new-task`，并严格检查 hidden 防泄露。
+- 要新增或修改单个任务（内置库或私有集都适用）：用 `ael-new-task`，并严格检查 hidden 防泄露。
 - 要把任务放进 smoke/regression：用 `ael-review-task-quality` 做质量审查。
 - 已经有评测结果但不知道问题在哪：用 `ael-analyze-results`。
 - 准备提交前：用 `ael-verify` 选验证闸，再按需要跑 `bash bin/ci-smoke.sh`。
