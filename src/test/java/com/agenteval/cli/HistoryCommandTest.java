@@ -76,6 +76,10 @@ class HistoryCommandTest {
         String page = Files.readString(html, StandardCharsets.UTF_8);
         assertThat(com.agenteval.report.HtmlRenderer.extractInlinedData(page)).isEqualTo(history);
         assertThat(page).doesNotContainPattern("(?i)<(script|link|img)[^>]+(src|href)=\"https?://");
+        // --out 指到非默认位置时，页面里的 run 链接仍要能从输出目录相对解析到 runs 根。
+        String expectedPrefix = outDir.toAbsolutePath().normalize()
+                .relativize(runsRoot.toAbsolutePath().normalize()).toString().replace('\\', '/');
+        assertThat(page).contains("data-runs-root=\"" + expectedPrefix + "\"");
     }
 
     @Test

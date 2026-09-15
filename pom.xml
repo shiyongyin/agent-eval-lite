@@ -6,7 +6,7 @@
 
     <groupId>com.agenteval</groupId>
     <artifactId>agent-eval-lite</artifactId>
-    <version>0.1.0</version>
+    <version>0.5.0</version>
     <name>AgentEval-Lite</name>
     <description>轻量级通用 AI Agent 评估框架：TaskSpec + Work/Hidden 隔离 + 结构化提交 + 隐藏 Judge + Trace + Report</description>
     <inceptionYear>2026</inceptionYear>

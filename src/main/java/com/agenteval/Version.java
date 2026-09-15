@@ -10,7 +10,7 @@ package com.agenteval;
 public final class Version {
 
     /** 引擎版本标识（随发布手工递增，与 pom 版本保持一致）。 */
-    public static final String ENGINE = "agent-eval-lite/0.1.0";
+    public static final String ENGINE = "agent-eval-lite/0.5.0";
 
     private Version() {
     }

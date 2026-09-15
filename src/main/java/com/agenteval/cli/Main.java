@@ -16,7 +16,7 @@ import picocli.CommandLine.Command;
 @Command(
         name = "agent-eval",
         mixinStandardHelpOptions = true,
-        version = "agent-eval-lite 0.1.0",
+        version = "agent-eval-lite 0.5.0",
         description = "企业内部 AI Agent 测试脚手架（AgentEval-Lite）",
         subcommands = {
                 RunCommand.class,

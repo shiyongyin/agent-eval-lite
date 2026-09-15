@@ -642,11 +642,32 @@ public final class SuiteRunner {
                     ? "多 Agent 对比面板"
                     : "任务集评估 " + json.path("suite").path("agent").asText();
             Files.writeString(outDir.resolve("suite_report.html"),
-                    HtmlRenderer.render(HtmlRenderer.Kind.SUITE, title, json), StandardCharsets.UTF_8);
+                    HtmlRenderer.render(HtmlRenderer.Kind.SUITE, title, json,
+                            HtmlRenderer.relativeRunsRoot(outDir, inferRunsRoot(json))),
+                    StandardCharsets.UTF_8);
             return jsonFile;
         } catch (IOException e) {
             throw new UncheckedIOException("写入套件报告失败: " + outDir, e);
         }
+    }
+
+    /**
+     * 从报告里任一 run 的绝对 {@code run_dir} 反推 runs 根（布局固定为 {@code <runs-root>/<task-id>/<run-id>}），
+     * 供 HTML 页面按实际输出目录拼相对链接；没有任何 run 时返回 {@code null}（页面回退默认布局）。
+     */
+    private static Path inferRunsRoot(ObjectNode json) {
+        for (JsonNode agentOrRoot : json.has("agents") ? json.path("agents") : List.of((JsonNode) json)) {
+            for (JsonNode task : agentOrRoot.path("results")) {
+                for (JsonNode run : task.path("runs")) {
+                    String dir = run.path("run_dir").asText("");
+                    if (!dir.isBlank()) {
+                        Path runDir = Path.of(dir);
+                        return runDir.getParent() == null ? null : runDir.getParent().getParent();
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     // ---------------------------------------------------------------- json（单 Agent）

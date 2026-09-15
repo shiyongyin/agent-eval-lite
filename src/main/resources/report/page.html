@@ -31,7 +31,7 @@
   a { color:#175cd3; }
 </style>
 </head>
-<body data-kind="__KIND__">
+<body data-kind="__KIND__" data-runs-root="__RUNS_ROOT__">
 <main id="app"><p class="empty">正在渲染…（本页需要启用 JavaScript；数据已内联在页面中）</p></main>
 <script type="application/json" id="ael-data">__DATA__</script>
 <script>
@@ -39,6 +39,8 @@
   'use strict';
   var data = JSON.parse(document.getElementById('ael-data').textContent);
   var kind = document.body.getAttribute('data-kind');
+  // runs 根相对本页目录的位置（由生成方按实际输出目录计算；默认布局为 ../..），用于拼 run 报告链接。
+  var runsRoot = (document.body.getAttribute('data-runs-root') || '../..').replace(/\/+$/, '');
   var app = document.getElementById('app');
 
   // ---- 安全的 DOM 构造：所有 JSON 字串只经 textContent 写入，绝不拼 innerHTML。
@@ -96,7 +98,7 @@
     });
     return svg;
   }
-  function runLink(taskId, runId) { return el('a', { href: '../../' + encodeURIComponent(taskId) + '/' + encodeURIComponent(runId) + '/report/report.html', text: runId }); }
+  function runLink(taskId, runId) { return el('a', { href: runsRoot + '/' + encodeURIComponent(taskId) + '/' + encodeURIComponent(runId) + '/report/report.html', text: runId }); }
 
   // ---- run：单次评估
   function renderRun(d) {
@@ -198,7 +200,7 @@
       return [code(t.task_id), code(t.agent), fmt(t.count), pct(t.pass_rate), fmt(t.first_score), fmt(t.last_score), fmt(t.best_score), t.deterministic === false ? '否' : '是', td(statusPill(t.latest_status))];
     })));
     section('最近运行', table(['开始时间', '任务', 'Agent', '模型', '状态', '分数', 'run'], (d.runs || []).slice(0, 200).map(function (r) {
-      var link = r.run_dir ? el('a', { href: '../../' + String(r.run_dir).split('/').map(encodeURIComponent).join('/') + '/report/report.html', text: r.run_id }) : code(r.run_id);
+      var link = r.run_dir ? el('a', { href: runsRoot + '/' + String(r.run_dir).split('/').map(encodeURIComponent).join('/') + '/report/report.html', text: r.run_id }) : code(r.run_id);
       return [r.started_at || '—', code(r.task_id), code(r.agent), r.model || '—', td(statusPill(r.status)), fmt(r.score), td(link)];
     })));
   }

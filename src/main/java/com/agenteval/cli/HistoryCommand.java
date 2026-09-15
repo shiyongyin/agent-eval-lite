@@ -423,7 +423,9 @@ public final class HistoryCommand implements Callable<Integer> {
             Files.writeString(jsonFile, json.toPrettyString(), StandardCharsets.UTF_8);
             Files.writeString(mdFile, markdown, StandardCharsets.UTF_8);
             Files.writeString(outDir.resolve("history.html"),
-                    HtmlRenderer.render(HtmlRenderer.Kind.HISTORY, "评估历史趋势", json), StandardCharsets.UTF_8);
+                    HtmlRenderer.render(HtmlRenderer.Kind.HISTORY, "评估历史趋势", json,
+                            HtmlRenderer.relativeRunsRoot(outDir, runsRoot)),
+                    StandardCharsets.UTF_8);
             return jsonFile;
         } catch (IOException e) {
             throw new UncheckedIOException("写入历史报告失败: " + outDir, e);

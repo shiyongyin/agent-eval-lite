@@ -684,11 +684,13 @@ public interface ToolHandler {
 | Phase | 内容 | 交付物 | 状态 |
 |---|---|---|---|
 | **0 调研** | 代码库理解 + EdgeBench 调研 + 选址 | docs/01、02、本文件 | ✅ 完成 |
-| **1 最小可运行** | TaskSpec 加载、workspace、manual/scripted/cli 三适配器、submission 校验、rules+script judge、trace、report(json+md)、resume-lite、stop-hook-lite、tool gateway 最小版、5 示例任务、单元+e2e 测试、README | `agent-eval run/judge/report/validate/list/tool` 全链路；`mvn verify` 全绿 | 待确认后实施 |
-| **2 多 Agent 对比** | http adapter（接 scaffold chat API）、cli agent 原生 resume/stop-hook、compare 汇总报告、LLM judge（rubric） | `agent-eval compare`；多模型对比报告 | 计划 |
-| **3 工具调用评估** | real 工具（http 白名单/db 只读）、auto-eval 间隔采样、mock server 化（跨进程） | 工具质量分析报告段 | 计划 |
-| **4 隔离增强** | Docker work/judge 双容器、网络白名单、HTTP judge server | task.yaml 增 image 字段（向后兼容） | 计划 |
-| **5 可视化** | 本地 dashboard 读 runs/（任务列表/run 详情/trace/report） | 静态站或本地小服务 | 可选 |
+| **1 最小可运行** | TaskSpec 加载、workspace、manual/scripted/cli 三适配器、submission 校验、rules+script judge、trace、report(json+md)、resume-lite、stop-hook-lite、tool gateway 最小版、5 示例任务、单元+e2e 测试、README | `agent-eval run/judge/report/validate/list/tool` 全链路；`mvn verify` 全绿 | ✅ 完成（0.1.0） |
+| **2 多 Agent 对比** | http adapter（接 scaffold chat API）、cli agent 原生 resume/stop-hook、compare 汇总报告、LLM judge（rubric） | `agent-eval compare`；多模型对比报告 | ✅ 完成（`suite --agents-file` 承担 compare；cli 原生 resume/stop-hook 未做，见 §10） |
+| **3 工具调用评估** | real 工具（http 白名单/db 只读）、auto-eval 间隔采样、mock server 化（跨进程） | 工具质量分析报告段 | ✅ 完成（db 只读后端因 JDBC 依赖暂不做） |
+| **4 隔离增强** | Docker work/judge 双容器、网络白名单、HTTP judge server | task.yaml 增 image 字段（向后兼容） | ◐ 部分：Agent 侧 `--sandbox docker` 已落地；judge 容器 / HTTP judge server 有意不做（理由见 §9.3） |
+| **5 可视化** | 本地 dashboard 读 runs/（任务列表/run 详情/trace/report） | 静态站或本地小服务 | ◐ 以自包含 HTML 报告替代（0.5.0：`report.html` / `suite_report.html` / `history.html`，无服务端）；看板服务按 docs/04 判定不做 |
+
+> 状态列更新于 2026-09-16；此后路线见 `docs/08-投入使用路线设计.md`（从"可用"到"在用"，不再按功能 Phase 推进）。
 
 **Phase 1 目标命令**：
 
