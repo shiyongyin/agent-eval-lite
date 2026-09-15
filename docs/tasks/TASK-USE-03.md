@@ -7,7 +7,7 @@ risk: medium
 featureFlag: none
 dodCommands:
   - docker build -f docker/agent-cli.Dockerfile -t ael-agent-cli .
-  - bin/agent-eval run --task tasks/api-payload-001 --agent cli --sandbox docker --sandbox-image ael-agent-cli --sandbox-network bridge --sandbox-docker-arg '-e ANTHROPIC_API_KEY' --cmd 'bash "$AEL_RUN_DIR/../../evalsets/_template/scripts/run-agent.sh" claude' --runs-root runs/dogfood
+  - bin/agent-eval run --task tasks/api-payload-001 --agent cli --sandbox docker --sandbox-image ael-agent-cli --sandbox-network bridge --sandbox-docker-arg=-e --sandbox-docker-arg=ANTHROPIC_API_KEY --cmd 'ael-run-agent claude' --runs-root runs/dogfood
   - git diff --check
 ---
 

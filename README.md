@@ -146,13 +146,23 @@ bin/agent-eval run --task tasks/api-payload-001 --agent cli \
     --cmd 'bash evalsets/_template/scripts/run-agent.sh codex' --label codex-v1
 ```
 
-对不可信或强对抗 Agent，使用 Docker 沙箱：
+对不可信或强对抗 Agent，使用 Docker 沙箱。仓库提供了能跑 Claude Code / Codex CLI 的镜像配方 [docker/agent-cli.Dockerfile](docker/agent-cli.Dockerfile)（自带 JRE、`ael-run-agent` 接入包装器和容器内 `agent-eval tool call` 垫片，不含任何凭证）：
 
 ```bash
-bin/agent-eval run --task tasks/code-fix-001 --agent cli --sandbox docker \
-    --sandbox-image my-agent-image:latest \
-    --cmd 'my-agent --instructions {instructions}'
+docker build -f docker/agent-cli.Dockerfile -t ael-agent-cli .
+
+bin/agent-eval run --task tasks/api-payload-001 --agent cli --sandbox docker \
+    --sandbox-image ael-agent-cli --sandbox-network bridge \
+    --sandbox-docker-arg=-e --sandbox-docker-arg=ANTHROPIC_API_KEY \
+    --cmd 'ael-run-agent claude' --label claude-docker
 ```
+
+要点：
+
+- 默认 `--sandbox-network none` 断网；要调模型 API 必须显式 `--sandbox-network bridge`，并接受"容器能出网"这个边界。
+- 凭证只经 `--sandbox-docker-arg=-e --sandbox-docker-arg=<VAR>` 从宿主环境透传，镜像和仓库里都不存密钥。`--sandbox-docker-arg` 一个 token 一个参数，不要写成 `'-e VAR'`。
+- Codex 用自定义 provider 时，把只含 provider 段的 `config.toml` 只读挂到 `/home/agent/.codex/config.toml`。
+- 用自己的镜像时，镜像须自带 Agent 命令、`bash`、`jq`，以及（任务有工具时）JRE。
 
 Docker 模式只挂载 `workspace/`、`inbox/`、`feedback/` 和 `instructions.md`。`hidden/`、`judge/`、`traces/`、任务目录和宿主家目录不会进入容器。
 
