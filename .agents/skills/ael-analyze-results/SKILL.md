@@ -28,7 +28,7 @@ RUN=$(bash "$ROOT/scripts/summarize-suite.sh" "$SUITE" --drill <agent> <task-id>
 bash "$ROOT/scripts/summarize-run.sh" "$RUN"
 ```
 
-**口径坑**：history 按 adapter 名聚合（多 label 的 cli 都叫 `cli`）；**横向对比以 suite 的 agent 标签为准**。comparison 无 `risk_summary`；single 才有。
+**口径坑**：history 按 run 的 label 聚合，没给 `--label` 的 run 和旧 run 都叫适配器名（多个 cli 合成一行 `cli`）；**横向对比以 suite 的 agent 标签为准**。comparison 无 `risk_summary`；single 才有。
 
 ## 第 1 步：定性（先分清是谁的问题）
 

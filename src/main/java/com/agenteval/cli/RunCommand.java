@@ -89,6 +89,10 @@ public final class RunCommand implements Callable<Integer> {
     @Option(names = "--model", description = "模型标识（仅用于报告归档）")
     private String model;
 
+    @Option(names = "--label",
+            description = "Agent 标签（进入 meta / report / history 的 agent 字段；默认取 Agent 类型名）")
+    private String label;
+
     @Option(names = "--runs-root", defaultValue = "runs", description = "runs 根目录（默认 ${DEFAULT-VALUE}）")
     private Path runsRoot;
 
@@ -123,7 +127,7 @@ public final class RunCommand implements Callable<Integer> {
         }
 
         RunManager.RunOutcome outcome = RunManager.execute(new RunManager.RunConfig(
-                taskDir, runsRoot, model, adapter, resumeRunDir));
+                taskDir, runsRoot, model, label, adapter, resumeRunDir));
 
         System.out.println();
         System.out.println("========== 评估完成 ==========");

@@ -41,7 +41,7 @@ class ReportGeneratorTest {
         Files.createDirectories(runDir.resolve("inbox"));
         Files.createDirectories(runDir.resolve("traces"));
 
-        new RunMeta("run_t", "task-x", taskDir.toString(), "cli", "redteam", "engine-test", Instant.EPOCH)
+        new RunMeta("run_t", "task-x", taskDir.toString(), "cli", "cli", "redteam", "engine-test", Instant.EPOCH)
                 .save(runDir.resolve("meta.json"));
         RunState state = new RunState(1, "run_t", "task-x", RunStatus.PASSED, "passed",
                 Instant.EPOCH, Instant.EPOCH.plusSeconds(1),
@@ -82,6 +82,33 @@ class ReportGeneratorTest {
         assertThat(usage.path("by_tool").path("user.lookup").asInt()).isEqualTo(1);
         assertThat(usage.path("unreferenced_success_calls").asInt()).isZero();
         assertThat(usage.path("untrusted_trace_events").asInt()).isEqualTo(1);
+    }
+
+    @Test
+    void 旧版meta缺agentAdapter_报告adapter回退为agentName_不报错() throws Exception {
+        Path taskDir = writeTask();
+        Path runDir = tempDir.resolve("run-legacy");
+        Files.createDirectories(runDir.resolve("judge"));
+        Files.createDirectories(runDir.resolve("inbox"));
+        Files.createDirectories(runDir.resolve("traces"));
+
+        // 0.4.0 之前的 meta.json：没有 agent_adapter 字段，agent_name 即适配器名。
+        Files.writeString(runDir.resolve("meta.json"), """
+                {"run_id":"run_legacy","task_id":"task-x","task_dir":"%s","agent_name":"cli",
+                 "model_name":"","engine_version":"engine-old","created_at":"2026-07-07T00:00:00Z"}
+                """.formatted(taskDir.toString().replace("\\", "\\\\")), StandardCharsets.UTF_8);
+        RunState state = new RunState(1, "run_legacy", "task-x", RunStatus.FAILED, "max_attempts_reached",
+                Instant.EPOCH, Instant.EPOCH.plusSeconds(1), List.of(), null, "hidden-fp", "workspace-fp");
+        RunStateStore.save(runDir.resolve("run_state.json"), state);
+        try (TraceLogger trace = TraceLogger.open(runDir.resolve("traces/trace.jsonl"), "run_legacy", SECRET)) {
+            trace.log(TraceEventType.RUN_STARTED, null, Map.of("task_id", "task-x", "agent", "cli"));
+        }
+
+        ReportGenerator.generate(runDir, SECRET);
+
+        JsonNode run = Jsons.json().readTree(Files.readString(runDir.resolve("report/report.json"))).path("run");
+        assertThat(run.path("agent").asText()).isEqualTo("cli");
+        assertThat(run.path("adapter").asText()).isEqualTo("cli");
     }
 
     private Path writeTask() throws Exception {

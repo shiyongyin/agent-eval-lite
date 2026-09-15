@@ -15,7 +15,7 @@
 
 ## history 口径
 
-- 按 `(task_id, agent_adapter_name)` 聚合；多个 `--label` 不同的 cli 在 history 里共享 `agent:"cli"`。
+- 按 `(task_id, agent)` 聚合，`agent` 取 run 的 label（`run --label` / `agents.yaml` 的 `label`），无 label 时回退适配器名。**旧 run（无 `agent_adapter` 字段的 meta.json）仍显示为适配器名**，多个 cli 会合成一行 `cli`；`report.json` 另有 `run.adapter` 区分接入形态。
 - **横向选型看 suite 标签**；history 只看单 Agent 纵向。
 - `.trends[]`：`count` `pass_rate` `first_score` `last_score` `best_score` `deterministic` `latest_status`
 - `.runs[]`：`run_id` `task_id` `agent` `model` `status` `score` `run_dir`（相对 `--runs-root`，可拼回目录）
@@ -74,7 +74,7 @@ CLI 退出码：0 完成（无论是否通过）/ 1 参数错 / **2 框架故障
 | auto_eval 采样分 | 正式成绩 | 不参与成绩 |
 | llm_rubric 分数漂 | 判分坏了 | `deterministic=false` 预期（权重≤30%） |
 | `max_attempts_reached` | 系统异常 | 正常用尽轮次 |
-| history 同行 `agent=cli` | 两个 Agent | adapter 同名；横向用 suite |
+| history 同行 `agent=cli` | 两个 Agent | 旧 run 或跑时没给 `--label`；补 label 重跑，或横向用 suite |
 
 ## 自测（维护本 skill 时）
 

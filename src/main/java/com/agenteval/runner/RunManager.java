@@ -72,11 +72,21 @@ public final class RunManager {
      * @param taskDir 任务目录（新 run 必填）
      * @param runsRoot runs 根目录（默认 {@code runs}）
      * @param modelName 模型标识（报告用，可为空）
+     * @param label Agent 标签（进入 meta / report / history 的 agent 字段；空则取适配器名）
      * @param adapter agent 适配器
      * @param resumeRunDir 待恢复的 run 目录（非 {@code null} 即 resume 模式）
      */
-    public record RunConfig(Path taskDir, Path runsRoot, String modelName,
+    public record RunConfig(Path taskDir, Path runsRoot, String modelName, String label,
                             AgentAdapter adapter, Path resumeRunDir) {
+
+        /**
+         * 报告与 history 使用的 Agent 名：label 优先，缺省回退适配器名。
+         *
+         * @return agent 名
+         */
+        public String agentName() {
+            return label == null || label.isBlank() ? adapter.name() : label;
+        }
     }
 
     /**
@@ -145,7 +155,7 @@ public final class RunManager {
             WorkspaceManager.Fingerprints fingerprints = WorkspaceManager.prepare(ctx);
             writeInstructions(ctx);
             new RunMeta(runId, spec.taskId(), ctx.taskDir().toString(),
-                    config.adapter().name(),
+                    config.agentName(), config.adapter().name(),
                     config.modelName() == null ? "" : config.modelName(),
                     Version.ENGINE, Instant.now())
                     .save(ctx.metaFile());
@@ -159,7 +169,8 @@ public final class RunManager {
             trace = TraceLogger.open(ctx.traceFile(), runId, traceSecret);
             trace.log(TraceEventType.RUN_STARTED, null, Map.of(
                     "task_id", spec.taskId(),
-                    "agent", config.adapter().name(),
+                    "agent", config.agentName(),
+                    "adapter", config.adapter().name(),
                     "model", config.modelName() == null ? "" : config.modelName(),
                     "engine_version", Version.ENGINE,
                     "hidden_fingerprint", fingerprints.hiddenFingerprint(),
@@ -472,7 +483,22 @@ public final class RunManager {
      * @return run 结论
      */
     public static RunOutcome run(Path taskDir, Path runsRoot, String modelName, AgentAdapter adapter) {
-        return execute(new RunConfig(taskDir, runsRoot, modelName, adapter, null));
+        return run(taskDir, runsRoot, modelName, null, adapter);
+    }
+
+    /**
+     * 便捷入口：带 Agent 标签的新 run（suite 多 Agent 对比 / {@code run --label}）。
+     *
+     * @param taskDir 任务目录
+     * @param runsRoot runs 根目录
+     * @param modelName 模型标识
+     * @param label Agent 标签（空则取适配器名）
+     * @param adapter 适配器
+     * @return run 结论
+     */
+    public static RunOutcome run(Path taskDir, Path runsRoot, String modelName, String label,
+                                 AgentAdapter adapter) {
+        return execute(new RunConfig(taskDir, runsRoot, modelName, label, adapter, null));
     }
 
     /**
@@ -483,6 +509,6 @@ public final class RunManager {
      * @return run 结论
      */
     public static RunOutcome resume(Path runDir, AgentAdapter adapter) {
-        return execute(new RunConfig(null, null, null, adapter, runDir));
+        return execute(new RunConfig(null, null, null, null, adapter, runDir));
     }
 }

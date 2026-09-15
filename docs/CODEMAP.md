@@ -172,6 +172,7 @@
 
 | 测试类 | 覆盖点（Javadoc 首句） |
 | --- | --- |
+| `AgentProcessTest` | 子进程执行内核的行为契约：真实 Agent CLI（如 codex exec）在 stdin 非 TTY 时会读到 EOF 才开始工作，框架必须给子进程一个已关闭的 stdin，否则 Agent 会一直等输入直到被超时强杀（dogfooding 实测所得）。 |
 | `DockerSandboxTest` | Docker 沙箱参数构造的安全契约回归：挂载矩阵（只挂 Agent 可触碰区、只读位正确）、默认断网、工具网关回连改写、占位符容器路径替换——argv 构造是纯函数，逐项钉死，防止未来改动悄悄把 hidden/任务目录挂进容器或把只读位放开。 |
 
 ### com.agenteval.cli
@@ -317,4 +318,4 @@
 
 ---
 
-统计：生产类 74 个 · 测试类 33 个。缺 Javadoc 的类会在上表显式标记（本地图以 Javadoc 首句为数据源，请随手补齐）。
+统计：生产类 74 个 · 测试类 34 个。缺 Javadoc 的类会在上表显式标记（本地图以 Javadoc 首句为数据源，请随手补齐）。

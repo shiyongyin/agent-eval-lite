@@ -131,12 +131,19 @@ bin/agent-eval run --task tasks/code-fix-001 --agent scripted \
 
 ### cli
 
-驱动任意命令行 Agent。命令模板支持 `{instructions}`、`{workspace}`、`{inbox}`、`{attempt_id}`、`{feedback}`、`{run_dir}`。
+驱动任意命令行 Agent。命令模板支持 `{instructions}`、`{workspace}`、`{inbox}`、`{attempt_id}`、`{feedback}`、`{run_dir}`。`--label` 给这次 run 一个 Agent 标签（进入 `report.json` 的 `run.agent` 和 `history` 分组），对比不同版本时务必区分。
 
 ```bash
 bin/agent-eval run --task tasks/code-fix-001 --agent cli \
     --cmd 'claude -p "$(cat {instructions})" --dangerously-skip-permissions' \
-    --model claude-sonnet
+    --model claude-sonnet --label claude-v1
+```
+
+不想自己拼命令时，用 evalset 脚手架自带的接入包装器（内置 `claude` / `codex` / `custom` 三个 profile，会自动把上一轮反馈拼进 prompt）：
+
+```bash
+bin/agent-eval run --task tasks/api-payload-001 --agent cli \
+    --cmd 'bash evalsets/_template/scripts/run-agent.sh codex' --label codex-v1
 ```
 
 对不可信或强对抗 Agent，使用 Docker 沙箱：

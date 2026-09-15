@@ -499,7 +499,7 @@ public final class SuiteRunner {
             for (int i = 1; i <= repeat; i++) {
                 long start = System.nanoTime();
                 RunManager.RunOutcome outcome = RunManager.run(
-                        taskDir, runsRoot, modelName, agent.factory().apply(taskDir));
+                        taskDir, runsRoot, modelName, agent.label(), agent.factory().apply(taskDir));
                 long durationMs = (System.nanoTime() - start) / 1_000_000;
                 JsonNode runReport = readRunReport(outcome.runDir());
                 JsonNode cost = readRunCost(runReport);

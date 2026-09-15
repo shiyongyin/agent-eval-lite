@@ -38,7 +38,7 @@ class OtlpTraceExporterTest {
     @BeforeAll
     static void runOnce() {
         Path taskDir = Path.of("tasks", "tool-call-001");
-        RunManager.RunOutcome outcome = RunManager.run(taskDir, runsRoot, "otlp-test",
+        RunManager.RunOutcome outcome = RunManager.run(taskDir, runsRoot, "otlp-test", "replay-baseline",
                 new ScriptedAgentAdapter(taskDir.resolve("samples/replay.yaml")));
         assertThat(outcome.status()).isEqualTo(RunStatus.PASSED);
         runDir = outcome.runDir();
@@ -59,6 +59,9 @@ class OtlpTraceExporterTest {
         }
         // 1 个 run 根 span + 3 轮 attempt + 4 次工具调用（2×lookup + 2×create）。
         assertThat(byKind.get("AGENT")).hasSize(1);
+        // 根 span 同时带 Agent 标签与适配器名：看板按 label 区分版本，按 adapter 区分接入形态。
+        assertThat(attr(byKind.get("AGENT").get(0), "agent.name")).isEqualTo("replay-baseline");
+        assertThat(attr(byKind.get("AGENT").get(0), "agent.adapter")).isEqualTo("scripted");
         assertThat(byKind.get("CHAIN")).hasSize(3);
         assertThat(byKind.get("TOOL")).hasSize(4);
 

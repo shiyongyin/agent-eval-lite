@@ -120,6 +120,7 @@ public final class ReportGenerator {
         run.put("task_name", spec.taskName());
         run.put("task_type", spec.taskType().jsonName());
         run.put("agent", meta.agentName());
+        run.put("adapter", meta.adapterOrAgentName());
         run.put("model", meta.modelName());
         run.put("engine_version", meta.engineVersion());
         run.put("started_at", state.startedAt().toString());
@@ -341,7 +342,9 @@ public final class ReportGenerator {
         sb.append(row("run_id", code(run.path("run_id").asText())));
         sb.append(row("任务", code(run.path("task_id").asText())
                 + "（" + run.path("task_type").asText() + "）"));
+        String adapter = run.path("adapter").asText("");
         sb.append(row("Agent / 模型", run.path("agent").asText()
+                + (adapter.isBlank() || adapter.equals(run.path("agent").asText()) ? "" : "（" + adapter + "）")
                 + (run.path("model").asText().isBlank() ? "" : " / " + run.path("model").asText())));
         sb.append(row("状态", "**" + run.path("status").asText() + "**"
                 + (run.path("status_reason").asText().isBlank() ? "" : "（" + run.path("status_reason").asText() + "）")));

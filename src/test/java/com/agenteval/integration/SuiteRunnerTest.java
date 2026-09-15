@@ -248,6 +248,37 @@ class SuiteRunnerTest {
                 .contains("`shell-copy`");
     }
 
+    @Test
+    void 多Agent对比_label进入run级meta与report_history按label分行() throws Exception {
+        // 两个 label 不同但同为 cli 适配器的 Agent：团队场景里的 current vs candidate。
+        List<SuiteRunner.AgentSpec> agents = List.of(
+                SuiteRunner.AgentSpec.cli("agent-current", goodAgentCmd()),
+                SuiteRunner.AgentSpec.cli("agent-candidate", failAgentCmd()));
+
+        SuiteRunner.ComparisonResult cmp = SuiteRunner.runComparison(
+                Path.of("tasks"), runsRoot, null, Set.of("api-payload-001"), agents, 1);
+
+        for (SuiteRunner.SuiteResult suite : cmp.perAgent()) {
+            Path runDir = suite.results().get(0).runs().get(0).runDir();
+            JsonNode meta = Jsons.json().readTree(Files.readString(runDir.resolve("meta.json")));
+            assertThat(meta.path("agent_name").asText()).isEqualTo(suite.agentLabel());
+            assertThat(meta.path("agent_adapter").asText()).isEqualTo("cli");
+
+            JsonNode report = Jsons.json().readTree(Files.readString(runDir.resolve("report/report.json")));
+            assertThat(report.path("run").path("agent").asText()).isEqualTo(suite.agentLabel());
+            assertThat(report.path("run").path("adapter").asText()).isEqualTo("cli");
+        }
+
+        // history 按 (task, agent) 聚合：两个 label 必须分成两行，而不是合并成一行 "cli"。
+        Path historyOut = outDir.resolve("history");
+        int exit = new picocli.CommandLine(new com.agenteval.cli.Main()).execute(
+                "history", "--runs-root", runsRoot.toString(), "--out", historyOut.toString());
+        assertThat(exit).isZero();
+        JsonNode history = Jsons.json().readTree(Files.readString(historyOut.resolve("history.json")));
+        assertThat(history.path("trends")).extracting(t -> t.path("agent").asText())
+                .containsExactlyInAnyOrder("agent-current", "agent-candidate");
+    }
+
     /**
      * 真实 cli Agent 命令：把任务自带的合格提交样例替换 attempt_id 后写入 inbox。
      *

@@ -15,7 +15,8 @@ import java.time.Instant;
  * @param runId run id
  * @param taskId 任务 id
  * @param taskDir 任务目录绝对路径
- * @param agentName 被评 agent 标识
+ * @param agentName 被评 agent 标识：有 label 时为 label（进入报告与 history 分组），否则为适配器名
+ * @param agentAdapter 适配器名（manual / scripted / cli / docker / http）；旧 meta.json 缺省为 {@code null}
  * @param modelName 模型标识（可为空字符串）
  * @param engineVersion 引擎版本
  * @param createdAt 创建时间
@@ -27,9 +28,20 @@ public record RunMeta(
         String taskId,
         String taskDir,
         String agentName,
+        String agentAdapter,
         String modelName,
         String engineVersion,
         Instant createdAt) {
+
+    /**
+     * 适配器名的兼容读法：旧 run 的 meta.json 没有 {@code agent_adapter}，回退到 {@code agent_name}
+     * （旧语义下二者相同）。
+     *
+     * @return 适配器名，永不为 {@code null}
+     */
+    public String adapterOrAgentName() {
+        return agentAdapter == null || agentAdapter.isBlank() ? agentName : agentAdapter;
+    }
 
     /**
      * 落盘到 run 目录。

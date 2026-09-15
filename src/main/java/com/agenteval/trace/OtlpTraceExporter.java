@@ -82,6 +82,7 @@ public final class OtlpTraceExporter {
         addAttr(attrsOf(rootSpan), "openinference.span.kind", "AGENT");
         addAttr(attrsOf(rootSpan), "task.id", meta.taskId());
         addAttr(attrsOf(rootSpan), "agent.name", meta.agentName());
+        addAttr(attrsOf(rootSpan), "agent.adapter", meta.adapterOrAgentName());
         addAttr(attrsOf(rootSpan), "model.name", meta.modelName());
         addAttr(attrsOf(rootSpan), "run.id", meta.runId());
         addAttr(attrsOf(rootSpan), "engine.version", meta.engineVersion());
