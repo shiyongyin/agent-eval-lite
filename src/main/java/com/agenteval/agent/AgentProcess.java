@@ -59,6 +59,9 @@ final class AgentProcess {
 
         try {
             Process process = builder.start();
+            // 立即关闭子进程 stdin：Agent CLI（如 codex exec）在 stdin 非 TTY 时会读到 EOF 才开工，
+            // 挂着的管道会让它一直等输入直到被超时强杀。
+            process.getOutputStream().close();
             boolean finished = process.waitFor(timeout.toSeconds(), TimeUnit.SECONDS);
             if (finished) {
                 return new Result(process.exitValue(), false);

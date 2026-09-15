@@ -25,7 +25,7 @@ bin/agent-eval evalset init --id my-agent
 | --- | --- |
 | `tasks/` | 私有任务库；每个任务结构同内置任务 |
 | `agents.yaml` | 多 Agent 横评清单 |
-| `scripts/run-agent.sh` | 团队 Agent 接入包装器 |
+| `scripts/run-agent.sh` | 团队 Agent 接入包装器；内置 `claude` / `codex` / `custom` 三个 profile，自动把上一轮反馈拼进 prompt |
 | `runs/` | 评测产物；不入库 |
 
 ## 标准命令
