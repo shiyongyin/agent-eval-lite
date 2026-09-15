@@ -4,6 +4,7 @@ title: --label 进入 meta/report/trace，history 按 label 分组
 module: runner / state / report / trace / cli
 dependsOn: []
 risk: medium
+status: done
 featureFlag: none
 dodCommands:
   - bash bin/gen-codemap.sh --check

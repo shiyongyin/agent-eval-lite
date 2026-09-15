@@ -4,6 +4,7 @@ title: 提供可运行 Agent CLI 的 Docker 沙箱镜像配方
 module: docker / docs
 dependsOn: []
 risk: medium
+status: done
 featureFlag: none
 dodCommands:
   - docker build -f docker/agent-cli.Dockerfile -t ael-agent-cli .

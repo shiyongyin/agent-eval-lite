@@ -4,6 +4,7 @@ title: evalset CI 工作流模板（PR 自动跑 smoke 门禁）
 module: evalsets/_template / cli
 dependsOn: [TASK-USE-02]
 risk: low
+status: done
 featureFlag: none
 dodCommands:
   - mvn -q -Dtest=EvalsetInitScaffoldTest test

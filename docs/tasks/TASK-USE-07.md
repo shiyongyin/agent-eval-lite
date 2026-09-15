@@ -4,6 +4,7 @@ title: 团队 evalset 第一批 5 个业务 smoke 任务
 module: evalsets/<team-set>（团队侧）
 dependsOn: [TASK-USE-01, TASK-USE-02]
 risk: medium
+status: todo-team   # 需要业务场景与团队 Agent；框架侧路径已由 R1 验证
 featureFlag: none
 dodCommands:
   - for d in evalsets/<team-set>/tasks/*/; do bin/agent-eval validate --task "$d"; done

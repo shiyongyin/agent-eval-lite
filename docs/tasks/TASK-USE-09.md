@@ -4,6 +4,7 @@ title: 文档口径（usage / OTLP / world_state）与 ScriptJudge 超时测试�
 module: docs / judge 测试
 dependsOn: []
 risk: low
+status: done
 featureFlag: none
 dodCommands:
   - git diff --check

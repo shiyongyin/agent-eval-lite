@@ -4,6 +4,7 @@ title: 真实 Agent 实跑（dogfooding）并产出问题清单
 module: runs / docs
 dependsOn: [TASK-USE-00]
 risk: medium
+status: done
 featureFlag: none
 dodCommands:
   - bin/agent-eval suite --tasks-root tasks --runs-root runs/dogfood --agent cli --cmd 'bash evalsets/_template/scripts/run-agent.sh claude' --label claude-code --repeat 3

@@ -4,6 +4,7 @@ title: 提交待收口的 research.md 与 ael-analyze-results 改动
 module: docs / .agents/skills
 dependsOn: []
 risk: low
+status: done
 featureFlag: none
 dodCommands:
   - git diff --check

@@ -4,6 +4,7 @@ title: run-agent.sh 内置 claude/codex/custom 预设并注入上一轮反馈
 module: evalsets/_template / docs
 dependsOn: []
 risk: medium
+status: done
 featureFlag: none
 dodCommands:
   - bash -n evalsets/_template/scripts/run-agent.sh

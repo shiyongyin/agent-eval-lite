@@ -4,6 +4,7 @@ title: 自包含 HTML 报告（suite_report.html / report.html / history.html）
 module: report / runner / cli
 dependsOn: [TASK-USE-04]
 risk: medium
+status: done
 featureFlag: none
 dodCommands:
   - bash bin/gen-codemap.sh --check

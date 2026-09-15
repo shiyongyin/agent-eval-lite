@@ -4,6 +4,7 @@ title: PENDING_HUMAN 的 suite 口径与人工复核留痕
 module: runner / docs
 dependsOn: []
 risk: low
+status: done
 featureFlag: none
 dodCommands:
   - mvn -q -Dtest=SuiteRunnerTest test
