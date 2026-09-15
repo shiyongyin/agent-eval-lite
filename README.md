@@ -332,6 +332,8 @@ bin/agent-eval export --run runs/xxx/run_yyy
 - [docs/05-交互式导览.html](docs/05-交互式导览.html)：用户、产品、开发三视角的单文件交互导览。
 - [docs/06-小团队落地指南.md](docs/06-小团队落地指南.md)：从私有 evalset、Agent 接入、suite 门禁到报告解读的落地路径。
 - [docs/07-任务质量清单.md](docs/07-任务质量清单.md)：任务进入 smoke/regression 前的质量审查标准。
+- [docs/08-投入使用路线设计.md](docs/08-投入使用路线设计.md)：从“可用”到“在用”的优先级、各项设计与边界。
+- [docs/09-投入使用任务卡.md](docs/09-投入使用任务卡.md)：任务卡索引；单卡在 [docs/tasks/](docs/tasks/)（TASK-USE-00…09），含 dependsOn、涉及文件、DoD 与 dodCommands。
 - [AGENTS.md](AGENTS.md)：AI 协作入口、架构分区、验证阶梯和安全红线。
 - [docs/CODEMAP.md](docs/CODEMAP.md)：由源码生成的类级地图，CI 会检查漂移。
 - [docs/PLAYBOOK.md](docs/PLAYBOOK.md)：新增 check、CLI、Agent adapter、任务、trace 事件等常见改造 recipe。
