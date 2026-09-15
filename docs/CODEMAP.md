@@ -38,6 +38,7 @@
 | 类 | 职责（Javadoc 首句） |
 | --- | --- |
 | `AgentAdapter` | Agent 适配器 SPI：把「任何能产出提交文件的东西」接入评估循环。 |
+| `AgentCliShim` | 在 run 目录的框架私有区（.ael/bin/）放一个 agent-eval 垫片，并把它前置到 cli Agent 子进程的 PATH。 |
 | `AgentProcess` | 子进程型 Agent 适配器的共享执行内核：启动进程、合流落盘、按预算超时强杀。 |
 | `AttemptInput` | 一次 attempt 的输入：Runner 交给 Agent 适配器的全部信息。 |
 | `AttemptOutcome` | 一次 attempt 的执行结果（Agent 侧视角，评分之前）。 |
@@ -190,6 +191,7 @@
 | 测试类 | 覆盖点（Javadoc 首句） |
 | --- | --- |
 | `AutoEvalSamplingTest` | auto-eval 后台采样端到端回归：用一个「先交草稿、再慢慢完成」的慢 Agent 驱动真实 run，验证设计 §10 的 Phase 3 语义——按间隔快照评审、轨迹进 trace 与 report、绝不回注 Agent、绝不影响正式成绩。 |
+| `CliAgentPathShimTest` | instructions.md 告诉 Agent 用 agent-eval tool call 调工具，那么 cli Agent 的子进程 PATH 上就必须 真的有 agent-eval——不能指望用户把 bin/ 加进 PATH（dogfooding 实测：真实 Agent 直接 command not found）。 |
 | `DockerSandboxRunTest` | Docker 沙箱端到端回归：在真实容器里跑真实任务（无 mock），验证两件事—— |
 | `EndToEndScriptedRunTest` | 端到端回归：用脚本回放适配器完整走通「run → 收件 → 判分 → 反馈 → 多轮修正 → 报告」。 |
 | `HttpAgentRunTest` | HTTP Agent 适配器端到端回归：起一个真实本地 HTTP 服务扮演服务型 Agent，验证「框架按轮 POST 任务说明 → 服务响应体即提交 → 判分 → 受控反馈 → 修正通过」全链路，以及请求契约（protocol / instructions / feedback / 自定义头）与各失败路径的语义。 |
@@ -320,4 +322,4 @@
 
 ---
 
-统计：生产类 75 个 · 测试类 35 个。缺 Javadoc 的类会在上表显式标记（本地图以 Javadoc 首句为数据源，请随手补齐）。
+统计：生产类 76 个 · 测试类 36 个。缺 Javadoc 的类会在上表显式标记（本地图以 Javadoc 首句为数据源，请随手补齐）。

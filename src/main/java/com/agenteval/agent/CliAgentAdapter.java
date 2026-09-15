@@ -55,6 +55,9 @@ public final class CliAgentAdapter implements AgentAdapter {
                 .replace("{run_dir}", quote(input.context().runDir().toAbsolutePath().toString()));
 
         Map<String, String> env = new LinkedHashMap<>();
+        // instructions 里承诺的 `agent-eval tool call` 必须在 Agent 的 PATH 上真的存在。
+        env.put("PATH", AgentCliShim.prependToPath(
+                AgentCliShim.ensure(input.context().runDir()), System.getenv("PATH")));
         env.put("AEL_RUN_DIR", input.context().runDir().toAbsolutePath().toString());
         env.put("AEL_INSTRUCTIONS", input.instructionsFile().toAbsolutePath().toString());
         env.put("AEL_WORKSPACE", input.context().workspaceDir().toAbsolutePath().toString());
