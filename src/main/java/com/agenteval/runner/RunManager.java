@@ -249,8 +249,7 @@ public final class RunManager {
                 // 有轮次但没交卷：按无效轮记录，反馈提醒后继续（不给 Agent 白嫖轮次的机会）。
                 trace.log(TraceEventType.ERROR, attemptId, Map.of("reason", "no_submission"));
                 FeedbackPolicy.writeInvalid(ctx.feedbackDir(), attemptId,
-                        java.util.List.of("本轮未在 inbox 中发现提交文件 " + attemptId + ".json"),
-                        nextAttemptId(spec, attemptNumber));
+                        noSubmissionErrors(ctx, attemptId), nextAttemptId(spec, attemptNumber));
                 state = state.withAttempt(new RunState.AttemptRecord(
                         attemptId, false, null, false, 0, java.util.List.of(), false,
                         elapsedMs(attemptStart), Instant.now()));
@@ -471,6 +470,27 @@ public final class RunManager {
             expectedSeq++;
         }
         return null;
+    }
+
+    /**
+     * 无提交时的反馈文案。除了"没找到"，还要检查 Agent 是否把文件写到了常见的错位路径
+     * （{@code workspace/inbox/<attempt>.json}、{@code workspace/<attempt>.json}）——dogfooding 实测真实 Agent
+     * 会按 cwd 相对解析 inbox 并宣称已提交。错位文件不计分（唯一通道不变），但要点名它并给出正确绝对路径。
+     */
+    private static java.util.List<String> noSubmissionErrors(TaskContext ctx, String attemptId) {
+        Path inbox = ctx.inboxDir().toAbsolutePath().normalize();
+        java.util.List<String> errors = new java.util.ArrayList<>();
+        errors.add("本轮未在 inbox 中发现提交文件 " + attemptId + ".json（提交目录：" + inbox + "）");
+        Path workspace = ctx.workspaceDir().toAbsolutePath().normalize();
+        for (Path candidate : java.util.List.of(
+                workspace.resolve("inbox").resolve(attemptId + ".json"),
+                workspace.resolve(attemptId + ".json"))) {
+            if (Files.isRegularFile(candidate)) {
+                errors.add("发现写错位置的同名文件 " + candidate + "：workspace 内的文件不算提交，请把它写到 "
+                        + inbox.resolve(attemptId + ".json") + " 这样的绝对路径下（下一轮换成下一轮的文件名）。");
+            }
+        }
+        return errors;
     }
 
     /**

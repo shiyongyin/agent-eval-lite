@@ -89,6 +89,23 @@ class FeedbackPolicyTest {
     }
 
     @Test
+    void nextStep给出inbox绝对路径_避免Agent按cwd相对解析写错位置() throws Exception {
+        // dogfooding 实测：next_step 写 "inbox/attempt_002.json" 时，真实 Agent 把它解析成 workspace/inbox/，提交丢失。
+        Path feedbackDir = tempDir.resolve("run_x").resolve("feedback");
+        Path file = FeedbackPolicy.writeInvalid(feedbackDir, "attempt_001",
+                List.of("本轮未在 inbox 中发现提交文件 attempt_001.json"), "attempt_002");
+        JsonNode node = read(file);
+        Path expectedInbox = tempDir.resolve("run_x").resolve("inbox").toAbsolutePath();
+        assertThat(node.path("next_step").asText())
+                .contains(expectedInbox.resolve("attempt_002.json").toString());
+
+        Path judged = FeedbackPolicy.writeJudged(feedbackDir, specWithLevel(FeedbackLevel.SUMMARY, false),
+                sampleResult(), "attempt_002");
+        assertThat(read(judged).path("next_step").asText())
+                .contains(expectedInbox.resolve("attempt_002.json").toString());
+    }
+
+    @Test
     void 无效提交反馈携带schema错误() throws Exception {
         Path file = FeedbackPolicy.writeInvalid(tempDir, "attempt_001",
                 List.of("$.summary: 长度不足"), "attempt_002");

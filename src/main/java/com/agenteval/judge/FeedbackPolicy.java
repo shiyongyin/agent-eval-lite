@@ -66,7 +66,7 @@ public final class FeedbackPolicy {
         if (level == FeedbackLevel.FULL) {
             node.set("passed_rules", Jsons.json().valueToTree(result.passedRules()));
         }
-        appendNextStep(node, result.passed(), nextAttemptId);
+        appendNextStep(node, result.passed(), nextAttemptId, feedbackDir);
         return write(feedbackDir, result.attemptId(), node);
     }
 
@@ -86,15 +86,21 @@ public final class FeedbackPolicy {
         node.put("valid", false);
         node.put("feedback", "提交未通过格式校验，本轮不计分。请修正后重新提交。");
         node.set("schema_errors", Jsons.json().valueToTree(errors));
-        appendNextStep(node, false, nextAttemptId);
+        appendNextStep(node, false, nextAttemptId, feedbackDir);
         return write(feedbackDir, attemptId, node);
     }
 
-    private static void appendNextStep(ObjectNode node, boolean passed, String nextAttemptId) {
+    /**
+     * 下一步提示里给 inbox 的绝对路径：run 目录布局固定为 {@code feedback/} 与 {@code inbox/} 平级。
+     * 写相对路径 {@code inbox/attempt_002.json} 时，真实 Agent 会按 cwd（workspace）解析、把提交写丢（dogfooding 实测）。
+     */
+    private static void appendNextStep(ObjectNode node, boolean passed, String nextAttemptId, Path feedbackDir) {
         if (passed) {
             node.put("next_step", "任务已通过，无需再提交。");
         } else if (nextAttemptId != null) {
-            node.put("next_step", "请将修正后的提交写入 inbox/" + nextAttemptId + ".json");
+            Path inbox = feedbackDir.toAbsolutePath().normalize().resolveSibling("inbox");
+            node.put("next_step", "请将修正后的提交写入 " + inbox.resolve(nextAttemptId + ".json")
+                    + "（绝对路径，不要按当前目录相对解析）");
             node.put("next_attempt_id", nextAttemptId);
         } else {
             node.put("next_step", "提交次数已用尽。");

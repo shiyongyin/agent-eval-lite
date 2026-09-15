@@ -195,6 +195,7 @@
 | `DockerSandboxRunTest` | Docker 沙箱端到端回归：在真实容器里跑真实任务（无 mock），验证两件事—— |
 | `EndToEndScriptedRunTest` | 端到端回归：用脚本回放适配器完整走通「run → 收件 → 判分 → 反馈 → 多轮修正 → 报告」。 |
 | `HttpAgentRunTest` | HTTP Agent 适配器端到端回归：起一个真实本地 HTTP 服务扮演服务型 Agent，验证「框架按轮 POST 任务说明 → 服务响应体即提交 → 判分 → 受控反馈 → 修正通过」全链路，以及请求契约（protocol / instructions / feedback / 自定义头）与各失败路径的语义。 |
+| `MisplacedSubmissionFeedbackTest` | dogfooding 实测的真实失误模式：Agent 把提交写到了 workspace/inbox/attempt_001.json（按 cwd 相对解析），自己还宣称"已提交"。 |
 | `ResumeEndToEndTest` | 轻量 Auto-Resume 端到端测试：进程「猝死」后凭 run_state 续跑，以及 resume 前 hidden 被篡改时的完整性熔断。 |
 | `SuiteRunnerTest` | 任务集批跑器的端到端回归：验证 SuiteRunner 能把任务库中每个任务的回放闭环 跑通并正确汇总，同时验证「过滤 / 报告落盘 / 全通过判据」这三条 CI 门禁依赖的能力。 |
 | `TaskInitScaffoldTest` | task init 脚手架端到端回归：生成的任务必须开箱即用—— 静态体检（validate + 深度 lint）通过，且 scripted 回放走完「失败 → 受控反馈 → 修正通过」闭环。 |
@@ -322,4 +323,4 @@
 
 ---
 
-统计：生产类 76 个 · 测试类 36 个。缺 Javadoc 的类会在上表显式标记（本地图以 Javadoc 首句为数据源，请随手补齐）。
+统计：生产类 76 个 · 测试类 37 个。缺 Javadoc 的类会在上表显式标记（本地图以 Javadoc 首句为数据源，请随手补齐）。
