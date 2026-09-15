@@ -74,7 +74,8 @@ public final class EvalsetCommand {
             System.out.println("已生成私有测评集脚手架: " + evalsetDir);
             System.out.println("  ├── README.md              # 小团队落地说明与标准命令");
             System.out.println("  ├── agents.yaml            # 多 Agent 横评清单");
-            System.out.println("  ├── scripts/run-agent.sh   # 团队 Agent 接入包装器");
+            System.out.println("  ├── scripts/run-agent.sh   # 团队 Agent 接入包装器（claude / codex / custom）");
+            System.out.println("  ├── ci/evalset-smoke.yml   # PR smoke 门禁工作流模板（复制到 .github/workflows/）");
             System.out.println("  └── tasks/.gitkeep         # 私有任务库（用 task init 填充）");
             System.out.println();
             System.out.println("下一步:");
@@ -90,11 +91,13 @@ public final class EvalsetCommand {
         private static final Map<String, String> TEMPLATE_RESOURCES = Map.of(
                 "README.md", "evalset-template/README.md",
                 "agents.yaml", "evalset-template/agents.yaml",
-                "scripts/run-agent.sh", "evalset-template/scripts/run-agent.sh");
+                "scripts/run-agent.sh", "evalset-template/scripts/run-agent.sh",
+                "ci/evalset-smoke.yml", "evalset-template/ci/evalset-smoke.yml");
 
         private static Map<String, String> templates() {
             Map<String, String> files = new LinkedHashMap<>();
-            for (String name : new String[] {"README.md", "agents.yaml", "scripts/run-agent.sh"}) {
+            for (String name : new String[] {
+                    "README.md", "agents.yaml", "scripts/run-agent.sh", "ci/evalset-smoke.yml"}) {
                 files.put(name, readResource(TEMPLATE_RESOURCES.get(name)));
             }
             files.put("tasks/.gitkeep", "");

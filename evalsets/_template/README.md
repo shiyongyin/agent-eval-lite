@@ -26,6 +26,7 @@ bin/agent-eval evalset init --id my-agent
 | `tasks/` | 私有任务库；每个任务结构同内置任务 |
 | `agents.yaml` | 多 Agent 横评清单 |
 | `scripts/run-agent.sh` | 团队 Agent 接入包装器；内置 `claude` / `codex` / `custom` 三个 profile，自动把上一轮反馈拼进 prompt |
+| `ci/evalset-smoke.yml` | GitHub Actions 模板：PR 跑 scripted smoke 基线，手动触发真实 Agent pass^2；复制到 `.github/workflows/` 使用 |
 | `runs/` | 评测产物；不入库 |
 
 ## 标准命令

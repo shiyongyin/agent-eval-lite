@@ -10,6 +10,7 @@
 | `tasks/` | 私有任务库；每个任务结构同内置任务：`task.yaml` + `work/` + `hidden/` + `samples/` |
 | `agents.yaml` | 多 Agent 横评清单；默认含 scripted 基线、current（claude）与 candidate（codex） |
 | `scripts/run-agent.sh` | 团队 Agent 接入包装器；内置 claude / codex / custom profile，统一组装 prompt、注入上一轮反馈 |
+| `ci/evalset-smoke.yml` | GitHub Actions 模板：PR 跑 scripted smoke 基线，手动触发真实 Agent pass^2；复制到 `.github/workflows/` 使用 |
 | `runs/` | 评测产物；不入库 |
 
 ## 从第一个任务开始

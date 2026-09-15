@@ -69,6 +69,31 @@ class EvalsetInitScaffoldTest {
     }
 
     @Test
+    void 生成CI工作流模板_可解析_smoke门禁与手动触发的模型job分离_不含明文密钥() throws Exception {
+        Path evalset = initEvalset("ci-set");
+        Path workflow = evalset.resolve("ci/evalset-smoke.yml");
+        assertThat(workflow).isRegularFile();
+
+        String yaml = Files.readString(workflow);
+        com.fasterxml.jackson.databind.JsonNode tree = com.agenteval.util.Jsons.yaml().readTree(yaml);
+        assertThat(tree.path("jobs").fieldNames()).toIterable()
+                .contains("smoke-scripted-baseline", "smoke-real-agents");
+        // scripted 基线每个 PR 都跑；真实模型 job 只手动触发，避免 PR 上意外花钱。
+        assertThat(tree.path("jobs").path("smoke-real-agents").path("if").asText())
+                .contains("workflow_dispatch");
+        assertThat(yaml)
+                .contains("--tier smoke")
+                .contains("--fail-on-not-passed")
+                .contains("EVALSET_DIR: evalsets/ci-set")
+                .contains("${{ secrets.")
+                .doesNotContain("__EVALSET_ID__")
+                .doesNotMatch("(?s).*(sk-[A-Za-z0-9]{8,}|ghp_[A-Za-z0-9]{8,}).*");
+
+        Path templateWorkflow = Path.of("evalsets/_template/ci/evalset-smoke.yml");
+        assertThat(Files.readString(templateWorkflow)).isEqualTo(yaml.replace("ci-set", "__EVALSET_ID__"));
+    }
+
+    @Test
     void 接入脚本_未知或custom_profile_明确报错退出2() throws Exception {
         Path evalset = initEvalset("err-set");
         Path inbox = Files.createDirectories(root.resolve("inbox"));

@@ -1,0 +1,120 @@
+# __EVALSET_ID__ 测评集 smoke 门禁（GitHub Actions 模板）。
+#
+# 用法：把本文件复制到你们仓库的 .github/workflows/ 下（它放在 evalsets/<set>/ci/ 只是模板位置，
+# 不会被 GitHub 自动识别），按下面注释改路径与触发条件。
+#
+# 两个 job：
+#   smoke-scripted-baseline  每个 PR 都跑：validate 全部任务 + scripted 回放 smoke 层。它证明的是
+#                            「任务本身没坏」——判分规则、样例、回放闭环仍然自洽。不花模型费用。
+#   smoke-real-agents        只手动触发（workflow_dispatch）：用 agents.yaml 里的真实 Agent 跑 smoke 层，
+#                            repeat 2 取 pass^2，任一 Agent 未稳定通过即失败。需要模型凭证，走 secrets。
+#
+# 两种布局：
+#   A. Agent 与测评集同仓库：本工作流直接放进 .github/workflows/，PR 改了 Agent 就会跑。
+#   B. Agent 在另一个仓库：把测评集仓库作为 submodule 引入 Agent 仓库，或在 Agent 仓库用
+#      repository_dispatch 触发本仓库的工作流；任务路径按实际挂载位置改。
+#
+# 要对不可信 Agent 强制 Docker 隔离时，参照框架仓库 .github/workflows/ci.yml 的
+# redteam-docker-enforced job：预拉固定 digest 的镜像，suite 加 --sandbox docker --sandbox-image。
+name: __EVALSET_ID__ smoke
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+env:
+  EVALSET_DIR: evalsets/__EVALSET_ID__
+
+jobs:
+  smoke-scripted-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      # 只构建 CLI jar；框架自身的测试与质量门在框架仓库的 CI 里跑。
+      - name: Build agent-eval CLI
+        run: mvn -q -B -DskipTests clean package
+
+      - name: Validate task specs
+        run: |
+          set -e
+          for d in "$EVALSET_DIR"/tasks/*/; do
+            ./bin/agent-eval validate --task "$d"
+          done
+
+      # scripted 基线：samples/replay.yaml 回放；任一 smoke 任务未通过 → 退出码 3 → CI 失败。
+      - name: Suite smoke gate (scripted baseline)
+        run: |
+          ./bin/agent-eval suite --tasks-root "$EVALSET_DIR/tasks" \
+            --runs-root "$EVALSET_DIR/runs" \
+            --tier smoke --agent scripted --repeat 1 \
+            --fail-on-not-passed
+
+      - name: Upload suite report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-report-scripted
+          path: |
+            evalsets/__EVALSET_ID__/runs/suite/**/suite_report.*
+          if-no-files-found: ignore
+
+  # 真实 Agent 门禁：只在手动触发时跑，避免每个 PR 都消耗模型额度。
+  smoke-real-agents:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      # 凭证只经 secrets 注入，永不写进仓库文件。
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Set up Node (Agent CLIs)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 按 agents.yaml 用到的 profile 安装 Agent CLI；不用的可以删掉。
+      - name: Install Agent CLIs
+        run: npm i -g @openai/codex @anthropic-ai/claude-code
+
+      - name: Build agent-eval CLI
+        run: mvn -q -B -DskipTests clean package
+
+      # agents.yaml 里的 cmd 依赖 run-agent.sh 与 agent-eval 在 PATH 上（工具网关经 agent-eval tool call 调用）。
+      - name: Suite smoke gate (real agents, pass^2)
+        run: |
+          export PATH="$PWD/bin:$PATH"
+          ./bin/agent-eval suite --tasks-root "$EVALSET_DIR/tasks" \
+            --runs-root "$EVALSET_DIR/runs" \
+            --tier smoke --agents-file "$EVALSET_DIR/agents.yaml" --repeat 2 \
+            --fail-on-not-passed
+
+      - name: Upload suite report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-report-real-agents
+          path: |
+            evalsets/__EVALSET_ID__/runs/suite/**/suite_report.*
+            evalsets/__EVALSET_ID__/runs/**/report/report.md
+          if-no-files-found: ignore
