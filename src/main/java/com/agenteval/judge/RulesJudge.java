@@ -208,9 +208,7 @@ public final class RulesJudge {
         List<String> invalid = new ArrayList<>();
         for (String source : cited) {
             boolean inVisibleList = visible.contains(source);
-            boolean existsInWorkspace = source.startsWith("work/")
-                    && Files.isRegularFile(input.workspaceDir().resolve(source.substring("work/".length())));
-            if (!inVisibleList && !existsInWorkspace) {
+            if (!inVisibleList && !existsInsideWorkspace(input.workspaceDir(), source)) {
                 invalid.add(source);
             }
         }
@@ -220,6 +218,21 @@ public final class RulesJudge {
         return invalid.isEmpty()
                 ? CheckOutcome.pass(def, "全部 " + cited.size() + " 条引用有效")
                 : CheckOutcome.fail(def, "无效引用: " + invalid);
+    }
+
+    /**
+     * 引用是否指向工作区内真实存在的文件。接受题面的两种写法——{@code work/docs/api.md}（visible_context 原文）
+     * 与 {@code docs/api.md} / {@code ./docs/api.md}（Agent 在工作区 cwd 看到的相对路径）；绝对路径与 {@code ..}
+     * 逃逸一律拒绝，避免把 hidden 或宿主任意文件当"材料"引用。
+     */
+    private static boolean existsInsideWorkspace(Path workspaceDir, String source) {
+        if (source == null || source.isBlank() || Path.of(source).isAbsolute()) {
+            return false;
+        }
+        String rel = source.startsWith("work/") ? source.substring("work/".length()) : source;
+        Path root = workspaceDir.toAbsolutePath().normalize();
+        Path resolved = root.resolve(rel).normalize();
+        return resolved.startsWith(root) && !resolved.equals(root) && Files.isRegularFile(resolved);
     }
 
     private static CheckOutcome workspaceFileExists(RulesFile.CheckDef def, JudgeInput input) {

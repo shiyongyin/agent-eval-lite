@@ -156,6 +156,49 @@ class RulesJudgeTest {
     }
 
     @Test
+    void evidenceSources_接受题面写法的工作区相对路径_拒绝越界与绝对路径() throws Exception {
+        // instructions 把材料写成 `docs/api.md`（相对工作区）；judge 只认 `work/docs/api.md` 会让真实 Agent 按题面引用却白丢分
+        //（dogfooding 3/3 run 复现）。三种等价写法都应有效；逃逸与绝对路径仍拒绝。
+        Files.createDirectories(workspace.resolve("docs"));
+        Files.writeString(workspace.resolve("docs/api.md"), "# api", StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve("docs/notes.md"), "# 材料外但在工作区内", StandardCharsets.UTF_8);
+        TaskSpec spec = new TaskSpec(1, "task-x", "t", com.agenteval.task.TaskType.GENERIC, "", "brief",
+                List.of("work/docs/api.md"), List.of(),
+                TestSpecs.singleDimension("task-x").submit(),
+                TestSpecs.singleDimension("task-x").judge(),
+                TestSpecs.singleDimension("task-x").scoring(),
+                TestSpecs.singleDimension("task-x").runtime());
+        Path rulesFile = taskDir.resolve("hidden/judge.rules.yaml");
+        Files.writeString(rulesFile, """
+                schema_version: 1
+                judge_version: "1.0.0"
+                checks:
+                  - {id: EV, type: evidence_sources_valid, dimension: main, points: 100}
+                """, StandardCharsets.UTF_8);
+
+        JsonNode good = json("""
+                {"evidence": [
+                  {"type": "file", "source": "docs/api.md"},
+                  {"type": "file", "source": "work/docs/api.md"},
+                  {"type": "file", "source": "./docs/notes.md"}
+                ]}
+                """);
+        Files.writeString(submissionFile, good.toPrettyString(), StandardCharsets.UTF_8);
+        List<CheckOutcome> ok = RulesJudge.run(RulesFile.load(rulesFile, Set.of("main")),
+                new JudgeInput(spec, taskDir, good, submissionFile, workspace, null, null, null, "run_t", "attempt_001"));
+        assertThat(ok.get(0).passed()).as(ok.get(0).message()).isTrue();
+
+        for (String bad : List.of("docs/../../hidden/answer.json", workspace.resolve("docs/api.md").toString(),
+                "docs/missing.md")) {
+            JsonNode sub = json("{\"evidence\": [{\"type\": \"file\", \"source\": \"" + bad.replace("\\", "\\\\") + "\"}]}");
+            Files.writeString(submissionFile, sub.toPrettyString(), StandardCharsets.UTF_8);
+            List<CheckOutcome> out = RulesJudge.run(RulesFile.load(rulesFile, Set.of("main")),
+                    new JudgeInput(spec, taskDir, sub, submissionFile, workspace, null, null, null, "run_t", "attempt_001"));
+            assertThat(out.get(0).passed()).as("应拒绝 %s", bad).isFalse();
+        }
+    }
+
+    @Test
     void changedFiles_申报未真实发生的修改被识破() throws Exception {
         Files.writeString(workspace.resolve("Main.java"), "class Main {}", StandardCharsets.UTF_8);
         Path baseline = tempDir.resolve("baseline.json");

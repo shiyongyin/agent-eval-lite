@@ -37,7 +37,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -161,7 +163,7 @@ public final class RunManager {
                     .save(ctx.metaFile());
 
             state = new RunState(1, runId, spec.taskId(), RunStatus.RUNNING, null,
-                    Instant.now(), Instant.now(), java.util.List.of(), null,
+                    Instant.now(), Instant.now(), List.of(), null,
                     fingerprints.hiddenFingerprint(), fingerprints.workspaceFingerprint());
             RunStateStore.save(ctx.runStateFile(), state);
 
@@ -251,7 +253,7 @@ public final class RunManager {
                 FeedbackPolicy.writeInvalid(ctx.feedbackDir(), attemptId,
                         noSubmissionErrors(ctx, attemptId), nextAttemptId(spec, attemptNumber));
                 state = state.withAttempt(new RunState.AttemptRecord(
-                        attemptId, false, null, false, 0, java.util.List.of(), false,
+                        attemptId, false, null, false, 0, List.of(), false,
                         elapsedMs(attemptStart), Instant.now()));
                 RunStateStore.save(ctx.runStateFile(), state);
                 continue;
@@ -271,7 +273,7 @@ public final class RunManager {
                 trace.log(TraceEventType.FEEDBACK_DELIVERED, attemptId,
                         Map.of("file", feedbackFile.toString(), "valid", false));
                 state = state.withAttempt(new RunState.AttemptRecord(
-                        attemptId, false, null, false, 0, java.util.List.of(), false,
+                        attemptId, false, null, false, 0, List.of(), false,
                         elapsedMs(attemptStart), Instant.now()));
                 RunStateStore.save(ctx.runStateFile(), state);
                 cooldown(spec, attemptNumber);
@@ -445,7 +447,7 @@ public final class RunManager {
     }
 
     private static String traceIntegrityProblem(Path traceFile, String runId) {
-        java.util.List<JsonNode> events;
+        List<JsonNode> events;
         try {
             events = TraceLogger.readAll(traceFile);
         } catch (RuntimeException e) {
@@ -477,12 +479,12 @@ public final class RunManager {
      * （{@code workspace/inbox/<attempt>.json}、{@code workspace/<attempt>.json}）——dogfooding 实测真实 Agent
      * 会按 cwd 相对解析 inbox 并宣称已提交。错位文件不计分（唯一通道不变），但要点名它并给出正确绝对路径。
      */
-    private static java.util.List<String> noSubmissionErrors(TaskContext ctx, String attemptId) {
+    private static List<String> noSubmissionErrors(TaskContext ctx, String attemptId) {
         Path inbox = ctx.inboxDir().toAbsolutePath().normalize();
-        java.util.List<String> errors = new java.util.ArrayList<>();
+        List<String> errors = new ArrayList<>();
         errors.add("本轮未在 inbox 中发现提交文件 " + attemptId + ".json（提交目录：" + inbox + "）");
         Path workspace = ctx.workspaceDir().toAbsolutePath().normalize();
-        for (Path candidate : java.util.List.of(
+        for (Path candidate : List.of(
                 workspace.resolve("inbox").resolve(attemptId + ".json"),
                 workspace.resolve(attemptId + ".json"))) {
             if (Files.isRegularFile(candidate)) {
