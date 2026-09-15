@@ -77,9 +77,12 @@ run_claude() {
 run_codex() {
   need codex "npm i -g @openai/codex，或改用 docker/agent-cli.Dockerfile 镜像"
   # workspace-write：只允许写 cwd（即 AEL_WORKSPACE）；--add-dir 放行 inbox。
+  # network_access=true：codex 的沙箱默认连 loopback 都禁，会让 `agent-eval tool call` 回连宿主工具网关
+  # 报 "Operation not permitted"（dogfooding 实测）；cli 模式本就与框架同机同信任域，这里放开。
   exec codex exec \
     --skip-git-repo-check \
     --sandbox workspace-write \
+    -c 'sandbox_workspace_write.network_access=true' \
     --add-dir "${AEL_INBOX}" \
     ${model_args[@]+"${model_args[@]}"} \
     ${extra_args[@]+"${extra_args[@]}"} \
