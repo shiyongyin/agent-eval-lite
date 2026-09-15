@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+  :root { --ok:#1a7f37; --bad:#b42318; --warn:#b54708; --muted:#667085; --line:#e4e7ec; --bg:#f8fafc; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Noto Sans CJK SC",sans-serif; color:#101828; background:var(--bg); }
+  main { max-width:1100px; margin:0 auto; padding:24px 20px 60px; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  h2 { font-size:16px; margin:28px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  .sub { color:var(--muted); margin-bottom:18px; }
+  .kv { display:grid; grid-template-columns:max-content 1fr; gap:4px 16px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px 16px; }
+  .kv dt { color:var(--muted); } .kv dd { margin:0; }
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { background:#f2f4f7; font-weight:600; color:#344054; }
+  tr:last-child td { border-bottom:none; }
+  code { font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; background:#f2f4f7; padding:1px 5px; border-radius:4px; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; font-weight:600; color:#fff; }
+  .ok { background:var(--ok); } .bad { background:var(--bad); } .warn { background:var(--warn); } .muted { background:var(--muted); }
+  .cell-ok { background:#e7f5ec; } .cell-bad { background:#fdecea; } .cell-warn { background:#fff4e5; } .cell-na { background:#f2f4f7; color:var(--muted); }
+  .bar { height:8px; background:#e4e7ec; border-radius:4px; overflow:hidden; } .bar > i { display:block; height:100%; background:var(--ok); }
+  .grid3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+  .callout { border-left:4px solid var(--warn); background:#fff; padding:10px 14px; border-radius:6px; }
+  svg text { font-size:11px; fill:var(--muted); }
+  .empty { color:var(--muted); font-style:italic; }
+  footer { margin-top:40px; color:var(--muted); font-size:12px; }
+  a { color:#175cd3; }
+</style>
+</head>
+<body data-kind="__KIND__">
+<main id="app"><p class="empty">正在渲染…（本页需要启用 JavaScript；数据已内联在页面中）</p></main>
+<script type="application/json" id="ael-data">__DATA__</script>
+<script>
+(function () {
+  'use strict';
+  var data = JSON.parse(document.getElementById('ael-data').textContent);
+  var kind = document.body.getAttribute('data-kind');
+  var app = document.getElementById('app');
+
+  // ---- 安全的 DOM 构造：所有 JSON 字串只经 textContent 写入，绝不拼 innerHTML。
+  function el(tag, attrs, children) {
+    var e = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === 'text') e.textContent = attrs[k] == null ? '' : String(attrs[k]);
+      else if (k === 'class') e.className = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { if (c != null) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return e;
+  }
+  function code(t) { return el('code', { text: t }); }
+  function pill(text, cls) { return el('span', { class: 'pill ' + cls, text: text }); }
+  function statusPill(s) {
+    var cls = s === 'PASSED' ? 'ok' : (s === 'ERROR' || s === 'INTEGRITY_BROKEN') ? 'warn' : (s === 'PENDING_HUMAN' ? 'warn' : (s ? 'bad' : 'muted'));
+    return pill(s || '—', cls);
+  }
+  function fmt(v, digits) { return v == null ? '—' : (typeof v === 'number' ? (digits == null ? String(v) : v.toFixed(digits)) : String(v)); }
+  function ms(v) { return v == null ? '—' : (v >= 60000 ? (v / 60000).toFixed(1) + ' min' : (v / 1000).toFixed(1) + ' s'); }
+  function pct(v) { return v == null ? '—' : (v * 100).toFixed(0) + '%'; }
+  function table(headers, rows) {
+    var t = el('table');
+    t.appendChild(el('thead', null, [el('tr', null, headers.map(function (h) { return el('th', { text: h }); }))]));
+    var tb = el('tbody');
+    if (!rows.length) tb.appendChild(el('tr', null, [el('td', { class: 'empty', colspan: String(headers.length), text: '（无）' })]));
+    rows.forEach(function (r) { tb.appendChild(el('tr', null, r.map(function (c) {
+      if (c && c.nodeType) return c.tagName === 'TD' ? c : el('td', null, [c]);
+      return el('td', null, [c == null ? '—' : String(c)]);
+    }))); });
+    t.appendChild(tb);
+    return t;
+  }
+  function td(content, cls) { var d = el('td', cls ? { class: cls } : null); if (content != null) d.appendChild(typeof content === 'string' || typeof content === 'number' ? document.createTextNode(String(content)) : content); return d; }
+  function kv(pairs) {
+    var dl = el('dl', { class: 'kv' });
+    pairs.forEach(function (p) { dl.appendChild(el('dt', { text: p[0] })); var dd = el('dd'); dd.appendChild(typeof p[1] === 'string' || typeof p[1] === 'number' ? document.createTextNode(String(p[1])) : (p[1] || document.createTextNode('—'))); dl.appendChild(dd); });
+    return dl;
+  }
+  function section(title, node) { app.appendChild(el('h2', { text: title })); if (node) app.appendChild(node); }
+  function sparkline(values, max) {
+    var w = 360, h = 90, pad = 24, n = values.length;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h); svg.setAttribute('width', w); svg.setAttribute('height', h);
+    var ymax = max || Math.max.apply(null, values.concat([1]));
+    var pts = values.map(function (v, i) { var x = pad + (n === 1 ? 0 : i * (w - 2 * pad) / (n - 1)); var y = h - pad - (v == null ? 0 : v) * (h - 2 * pad) / ymax; return [x, y, v]; });
+    var poly = document.createElementNS(svg.namespaceURI, 'polyline');
+    poly.setAttribute('points', pts.map(function (p) { return p[0] + ',' + p[1]; }).join(' '));
+    poly.setAttribute('fill', 'none'); poly.setAttribute('stroke', '#175cd3'); poly.setAttribute('stroke-width', '2');
+    svg.appendChild(poly);
+    pts.forEach(function (p, i) {
+      var c = document.createElementNS(svg.namespaceURI, 'circle'); c.setAttribute('cx', p[0]); c.setAttribute('cy', p[1]); c.setAttribute('r', 3.5); c.setAttribute('fill', '#175cd3'); svg.appendChild(c);
+      var t = document.createElementNS(svg.namespaceURI, 'text'); t.setAttribute('x', p[0]); t.setAttribute('y', h - 6); t.setAttribute('text-anchor', 'middle'); t.textContent = 'a' + (i + 1) + ': ' + fmt(p[2]); svg.appendChild(t);
+    });
+    return svg;
+  }
+  function runLink(taskId, runId) { return el('a', { href: '../../' + encodeURIComponent(taskId) + '/' + encodeURIComponent(runId) + '/report/report.html', text: runId }); }
+
+  // ---- run：单次评估
+  function renderRun(d) {
+    var run = d.run || {}, best = d.best_attempt || {}, attempts = d.attempts || [];
+    app.appendChild(el('h1', null, ['评估报告 ', code(run.task_id), ' ', statusPill(run.status)]));
+    app.appendChild(el('p', { class: 'sub', text: (run.task_name || '') + (run.status_reason ? '　原因：' + run.status_reason : '') }));
+    app.appendChild(kv([
+      ['run_id', code(run.run_id)], ['Agent', (run.agent || '—') + (run.adapter && run.adapter !== run.agent ? '（' + run.adapter + '）' : '')],
+      ['模型', run.model || '—'], ['耗时', ms(run.duration_ms)], ['引擎', run.engine_version || '—'],
+      ['最佳轮次', best.attempt_id ? best.attempt_id + '：' + fmt(best.score) + ' / ' + fmt(best.max_score) + '（策略 ' + (best.selection_policy || '') + '）' : '—']
+    ]));
+    if ((d.safety || {}).needs_human_review) app.appendChild(el('p', { class: 'callout', text: 'Agent 请求人工复核：本 run 不计通过，请按 docs/06 的复核流程处理。' }));
+
+    section('分数轨迹', el('div', null, [sparkline((d.score_trajectory || []).map(function (v) { return v == null ? 0 : v; }), best.max_score || 100)]));
+
+    section('维度得分（最佳轮次）', table(['维度', '得分', '满分', ''], (best.dimension_breakdown || []).map(function (b) {
+      var ratio = b.max ? Math.max(0, Math.min(1, (b.earned || 0) / b.max)) : 0;
+      var bar = el('div', { class: 'bar' }, [el('i', { style: 'width:' + (ratio * 100).toFixed(0) + '%' })]);
+      return [b.dimension, fmt(b.earned, 1), fmt(b.max), td(bar)];
+    })));
+
+    section('未通过的检查（最佳轮次，对外文案）', table(['规则', '维度', '严重度', '失分', '一票否决', '说明'], (best.failed_rules || []).map(function (r) {
+      return [code(r.rule_id), r.dimension, r.severity, fmt(r.points_lost, 1), r.blocking ? '是' : '否', r.message];
+    })));
+
+    section('逐轮明细', table(['轮次', '提交合法', '分数', '通过', '未通过规则', '人工复核', '耗时'], attempts.map(function (a) {
+      return [a.attempt_id, a.valid ? '是' : '否', fmt(a.score), td(statusPill(a.passed ? 'PASSED' : (a.valid ? 'FAILED' : 'INVALID'))), (a.failed_rule_ids || []).join(', ') || '—', a.needs_human_review ? '请求' : '—', ms(a.duration_ms)];
+    })));
+
+    var tu = d.tool_usage || {}, cost = d.cost || {}, safety = d.safety || {}, fs = d.failure_stats || {};
+    var byTool = Object.keys(tu.by_tool || {}).map(function (k) { return k + ' × ' + tu.by_tool[k]; }).join('，') || '—';
+    var byRule = Object.keys(fs.by_rule || {}).map(function (k) { return k + ' × ' + fs.by_rule[k]; }).join('，') || '—';
+    section('工具 / 安全 / 成本', el('div', { class: 'grid3' }, [
+      kv([['可信工具调用', fmt(tu.total_calls)], ['按工具', byTool], ['失败调用', fmt(tu.failed_calls)], ['未被引用的成功调用', fmt(tu.unreferenced_success_calls)], ['不可信 trace 事件', fmt(tu.untrusted_trace_events)], ['签名核验', tu.signature_verification || '—']]),
+      kv([['canary 泄露', fmt(safety.canary_leaks)], ['hidden 完整性', safety.hidden_integrity || '—'], ['非法提交次数', fmt(fs.invalid_submissions)], ['失败规则热点', byRule]]),
+      kv([['成本口径', cost.reported ? 'Agent 自报（不参与评分）' : '未自报'], ['总 tokens', fmt(cost.total_tokens)], ['成本 USD', fmt(cost.cost_usd, 4)], ['有 usage 的轮次', fmt(cost.attempts_with_usage)]])
+    ]));
+  }
+
+  // ---- suite：单 Agent 批跑 或 多 Agent 对比
+  function taskCell(t) {
+    if (!t) return td('—', 'cell-na');
+    if (t.error) return td('故障', 'cell-warn');
+    var hasPending = (t.runs || []).some(function (r) { return r.status === 'PENDING_HUMAN'; });
+    var txt = (t.pass_count != null && t.repeat != null) ? t.pass_count + '/' + t.repeat : (t.passed ? '✓' : '✗');
+    txt += '　' + fmt(t.score) + '分';
+    var cls = t.pass_at_k ? 'cell-ok' : (hasPending ? 'cell-warn' : 'cell-bad');
+    var cell = td(null, cls);
+    cell.appendChild(document.createTextNode(txt));
+    (t.runs || []).forEach(function (r) { cell.appendChild(document.createTextNode(' ')); cell.appendChild(runLink(t.task_id, r.run_id)); });
+    return cell;
+  }
+  function riskSummary(risk) {
+    if (!risk) return null;
+    var items = [
+      ['未稳定通过任务', (risk.not_passed_tasks || []).join(', ') || '无'],
+      ['框架故障 / 完整性异常', (risk.setup_error_tasks || []).join(', ') || '无'],
+      ['flaky（pass@1 过但 pass^k 未过）', (risk.flaky_tasks || []).join(', ') || '无'],
+      ['待人工复核', (risk.pending_human_tasks || []).join(', ') || '无'],
+      ['失败规则热点', Object.keys(risk.failed_rules_by_id || {}).map(function (k) { return k + ' × ' + risk.failed_rules_by_id[k]; }).join('，') || '无'],
+      ['需要处理', risk.action_required ? '是' : '否']
+    ];
+    return kv(items);
+  }
+  function renderSuiteSingle(d) {
+    var s = d.suite || {};
+    app.appendChild(el('h1', null, ['任务集评估 ', code(s.agent), ' ', pill(s.all_passed ? '全部稳定通过' : '存在未稳定通过', s.all_passed ? 'ok' : 'bad')]));
+    app.appendChild(el('p', { class: 'sub', text: '任务根 ' + (s.tasks_root || '') + '　repeat=' + fmt(s.repeat) + '　' + fmt(s.passed) + '/' + fmt(s.total) + ' 任务稳定通过　pass_rate ' + pct(s.pass_rate) + '　平均耗时 ' + ms(s.avg_duration_ms) + (s.total_cost_usd != null ? '　自报成本 $' + fmt(s.total_cost_usd, 4) : '') }));
+    section('小团队操作摘要', riskSummary(d.risk_summary));
+    section('逐任务明细', table(['任务', 'pass^k', '得分 / 通过线', '平均耗时', '未通过规则', 'run'], (d.results || []).map(function (t) {
+      var c = taskCell(t); c.textContent = ''; c.appendChild(document.createTextNode(t.error ? '故障：' + t.error : (t.pass_count + '/' + t.repeat)));
+      var links = el('span'); (t.runs || []).forEach(function (r, i) { if (i) links.appendChild(document.createTextNode(' ')); links.appendChild(runLink(t.task_id, r.run_id)); });
+      return [code(t.task_id), c, fmt(t.score) + ' / ' + fmt(t.pass_score), ms(t.avg_duration_ms), (t.failed_rule_ids || []).join(', ') || '—', td(links)];
+    })));
+  }
+  function renderSuiteComparison(d) {
+    var agents = d.agents || [];
+    var taskIds = d.tasks || [];
+    if (!taskIds.length) { var seen = {}; agents.forEach(function (a) { (a.results || []).forEach(function (r) { if (!seen[r.task_id]) { seen[r.task_id] = 1; taskIds.push(r.task_id); } }); }); }
+    app.appendChild(el('h1', null, ['多 Agent 对比面板']));
+    app.appendChild(el('p', { class: 'sub', text: agents.length + ' 个 Agent × ' + taskIds.length + ' 个任务　repeat=' + fmt(d.repeat != null ? d.repeat : (agents[0] || {}).repeat) + (d.tasks_root ? '　任务根 ' + d.tasks_root : '') }));
+    section('Agent 排名', table(['Agent', '稳定通过', 'pass_rate', '平均耗时', '自报成本', '结论'], agents.slice().sort(function (a, b) { return (b.pass_rate || 0) - (a.pass_rate || 0); }).map(function (a) {
+      return [code(a.agent), fmt(a.passed) + '/' + fmt(a.total), pct(a.pass_rate), ms(a.avg_duration_ms), a.total_cost_usd != null ? '$' + fmt(a.total_cost_usd, 4) : '—', td(pill(a.all_passed ? '全部稳定通过' : '有未通过', a.all_passed ? 'ok' : 'bad'))];
+    })));
+    var headers = ['任务'].concat(agents.map(function (a) { return a.agent; }));
+    var rows = taskIds.map(function (tid) {
+      return [code(tid)].concat(agents.map(function (a) { return taskCell((a.results || []).filter(function (r) { return r.task_id === tid; })[0]); }));
+    });
+    section('任务 × Agent 矩阵（格内为 pass^k 计数 / 得分，链接到 run 报告）', table(headers, rows));
+  }
+
+  // ---- history：趋势
+  function renderHistory(d) {
+    app.appendChild(el('h1', null, ['评估历史趋势']));
+    app.appendChild(el('p', { class: 'sub', text: fmt(d.run_count) + ' 个 run　' + fmt(d.task_count) + ' 个任务　' + fmt(d.agent_count) + ' 个 Agent' + (d.generated_at ? '　生成于 ' + d.generated_at : '') }));
+    var rt = d.redteam;
+    if (rt) { var c = rt.counts || {}; section('红队门禁摘要', kv([['门禁', rt.gate || '—'], ['DEFENDED', fmt(c.defended)], ['VULNERABLE', fmt(c.vulnerable) + '（登记基线 ' + fmt(rt.allowed_vulnerable_baseline) + '）'], ['INFRA', fmt(c.infra)], ['CHECK', fmt(c.check)], ['生成于', rt.generated_at || '—']])); }
+    section('按任务 × Agent 的趋势', table(['任务', 'Agent', '次数', 'pass_rate', '首次', '最近', '最佳', '判分确定性', '最近状态'], (d.trends || []).map(function (t) {
+      return [code(t.task_id), code(t.agent), fmt(t.count), pct(t.pass_rate), fmt(t.first_score), fmt(t.last_score), fmt(t.best_score), t.deterministic === false ? '否' : '是', td(statusPill(t.latest_status))];
+    })));
+    section('最近运行', table(['开始时间', '任务', 'Agent', '模型', '状态', '分数', 'run'], (d.runs || []).slice(0, 200).map(function (r) {
+      var link = r.run_dir ? el('a', { href: '../../' + String(r.run_dir).split('/').map(encodeURIComponent).join('/') + '/report/report.html', text: r.run_id }) : code(r.run_id);
+      return [r.started_at || '—', code(r.task_id), code(r.agent), r.model || '—', td(statusPill(r.status)), fmt(r.score), td(link)];
+    })));
+  }
+
+  app.textContent = '';
+  try {
+    if (kind === 'run') renderRun(data);
+    else if (kind === 'suite') (data.mode === 'comparison' ? renderSuiteComparison : renderSuiteSingle)(data);
+    else if (kind === 'history') renderHistory(data);
+    else app.appendChild(el('p', { class: 'empty', text: '未知页面类型：' + kind }));
+  } catch (e) {
+    app.appendChild(el('p', { class: 'callout', text: '渲染失败：' + e.message + '。原始数据仍在页面源码的 ael-data 块中。' }));
+  }
+  app.appendChild(el('footer', { text: 'AgentEval-Lite · 本页为同目录 JSON 报告的只读视图，数据已内联，可离线打开与转发；判分事实源为 run 目录内的签名 trace 与工件。' }));
+})();
+</script>
+</body>
+</html>

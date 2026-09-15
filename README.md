@@ -91,8 +91,9 @@ bin/agent-eval list
 bin/agent-eval run --task tasks/api-payload-001 --agent scripted \
     --script tasks/api-payload-001/samples/replay.yaml
 
-# 查看报告
+# 查看报告（同目录还有 report.json 和可直接转发的单文件 report.html）
 cat runs/api-payload-001/run_*/report/report.md
+open runs/api-payload-001/run_*/report/report.html
 ```
 
 初始化团队自己的私有测评集：
@@ -195,7 +196,9 @@ bin/agent-eval suite --tier smoke --fail-on-not-passed
 bin/agent-eval history --runs-root runs
 ```
 
-`suite` 会生成 `suite_report.json` 和 `suite_report.md`，包含小团队操作摘要、任务矩阵、稳定通过数、失败规则热点、平均耗时和可选 usage 成本聚合。
+`suite` 会生成 `suite_report.json`、`suite_report.md` 和 `suite_report.html`，包含小团队操作摘要、任务矩阵、稳定通过数、失败规则热点、平均耗时和可选 usage 成本聚合。
+
+三类报告（run / suite / history）都同时产出 `.json`、`.md`、`.html`。HTML 是同目录 JSON 的只读视图：数据内联在页面里、零外链、可离线打开或直接发给不看终端的同事；矩阵格子可点进对应 run 的 `report.html`。它不读 `judge/`、`hidden/`，也不新增任何字段。
 
 `evalsets/demo-ops-agent/` 提供了一个完整私有测评集示例，包含两个任务、三个 Agent 和对比面板命令。
 

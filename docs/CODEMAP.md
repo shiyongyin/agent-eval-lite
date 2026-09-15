@@ -87,6 +87,7 @@
 | 类 | 职责（Javadoc 首句） |
 | --- | --- |
 | `BestAttemptSelector` | 最佳 attempt 选择器：按任务声明的策略从全部 attempt 中挑出计入总结的那一次。 |
+| `HtmlRenderer` | 把公开报告 JSON（run / suite / history）渲染成单文件、零外链的 HTML 视图。 |
 | `ReportGenerator` | 报告生成器：从 run 目录的既有工件（meta / run_state / judge / trace / inbox） 纯读地重建评估报告，输出机器可读的 report.json 与人类可读的 report.md。 |
 
 ### com.agenteval.runner
@@ -216,6 +217,7 @@
 | 测试类 | 覆盖点（Javadoc 首句） |
 | --- | --- |
 | `BestAttemptSelectorTest` | BestAttemptSelector 三种策略的选择行为测试。 |
+| `HtmlRendererTest` | HtmlRenderer 的注入面：来自报告 JSON 的任意字符串（feedback 文案、规则 id、Agent 标签） 不得闭合内联数据块或注入标签；内联数据必须能原样取回。 |
 | `ReportGeneratorTest` | ReportGenerator 的报告重建行为测试：从 run 工件纯读重建 report.json/report.md，工具统计只计入签名可核验的 tool_call 事件（与判分同口径，防伪造统计混入报告）。 |
 
 ### com.agenteval.submission
@@ -318,4 +320,4 @@
 
 ---
 
-统计：生产类 74 个 · 测试类 34 个。缺 Javadoc 的类会在上表显式标记（本地图以 Javadoc 首句为数据源，请随手补齐）。
+统计：生产类 75 个 · 测试类 35 个。缺 Javadoc 的类会在上表显式标记（本地图以 Javadoc 首句为数据源，请随手补齐）。

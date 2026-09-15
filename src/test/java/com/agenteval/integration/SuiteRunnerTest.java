@@ -81,6 +81,18 @@ class SuiteRunnerTest {
         // Markdown 汇总应包含任务集标题与逐任务明细表头。
         String md = Files.readString(outDir.resolve("suite_report.md"));
         assertThat(md).contains("任务集评估汇总").contains("小团队操作摘要").contains("逐任务明细");
+
+        // 同目录还应有自包含 HTML：内联数据与 JSON 一致，不含私有诊断与外链。
+        assertHtmlMirrorsJson(outDir.resolve("suite_report.html"), report);
+    }
+
+    private static void assertHtmlMirrorsJson(Path html, JsonNode json) throws IOException {
+        assertThat(html).isRegularFile();
+        String page = Files.readString(html);
+        assertThat(com.agenteval.report.HtmlRenderer.extractInlinedData(page)).isEqualTo(json);
+        assertThat(page)
+                .doesNotContain("private_notes")
+                .doesNotContainPattern("(?i)<(script|link|img)[^>]+(src|href)=\"https?://");
     }
 
     @Test
@@ -246,6 +258,7 @@ class SuiteRunnerTest {
                 .contains("任务 × Agent")
                 .contains("`scripted`")
                 .contains("`shell-copy`");
+        assertHtmlMirrorsJson(outDir.resolve("suite_report.html"), report);
     }
 
     @Test

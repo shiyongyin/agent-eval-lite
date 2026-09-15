@@ -6,6 +6,7 @@ import com.agenteval.agent.DockerAgentAdapter;
 import com.agenteval.agent.DockerSandbox;
 import com.agenteval.agent.HttpAgentAdapter;
 import com.agenteval.agent.ScriptedAgentAdapter;
+import com.agenteval.report.HtmlRenderer;
 import com.agenteval.state.RunStatus;
 import com.agenteval.task.TaskSpec;
 import com.agenteval.task.TaskSpecLoader;
@@ -637,6 +638,11 @@ public final class SuiteRunner {
             Path mdFile = outDir.resolve("suite_report.md");
             Files.writeString(jsonFile, json.toPrettyString(), StandardCharsets.UTF_8);
             Files.writeString(mdFile, markdown, StandardCharsets.UTF_8);
+            String title = "comparison".equals(json.path("mode").asText())
+                    ? "多 Agent 对比面板"
+                    : "任务集评估 " + json.path("suite").path("agent").asText();
+            Files.writeString(outDir.resolve("suite_report.html"),
+                    HtmlRenderer.render(HtmlRenderer.Kind.SUITE, title, json), StandardCharsets.UTF_8);
             return jsonFile;
         } catch (IOException e) {
             throw new UncheckedIOException("写入套件报告失败: " + outDir, e);

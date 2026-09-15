@@ -99,6 +99,10 @@ public final class ReportGenerator {
             Path mdFile = reportDir.resolve("report.md");
             Files.writeString(jsonFile, report.toPrettyString(), StandardCharsets.UTF_8);
             Files.writeString(mdFile, markdown, StandardCharsets.UTF_8);
+            Files.writeString(reportDir.resolve("report.html"),
+                    HtmlRenderer.render(HtmlRenderer.Kind.RUN,
+                            "评估报告 " + meta.taskId() + " · " + meta.runId(), report),
+                    StandardCharsets.UTF_8);
             return new Paths(jsonFile, mdFile);
         } catch (IOException e) {
             throw new UncheckedIOException("写入报告失败", e);

@@ -69,6 +69,13 @@ class HistoryCommandTest {
         assertThat(history.path("redteam").path("counts").path("defended").asInt()).isEqualTo(16);
 
         assertThat(outDir.resolve("history.md")).isRegularFile();
+
+        // 自包含 HTML：内联数据与 history.json 一致，无外链。
+        Path html = outDir.resolve("history.html");
+        assertThat(html).isRegularFile();
+        String page = Files.readString(html, StandardCharsets.UTF_8);
+        assertThat(com.agenteval.report.HtmlRenderer.extractInlinedData(page)).isEqualTo(history);
+        assertThat(page).doesNotContainPattern("(?i)<(script|link|img)[^>]+(src|href)=\"https?://");
     }
 
     @Test

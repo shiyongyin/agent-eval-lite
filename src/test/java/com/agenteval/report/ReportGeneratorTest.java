@@ -111,6 +111,51 @@ class ReportGeneratorTest {
         assertThat(run.path("adapter").asText()).isEqualTo("cli");
     }
 
+    @Test
+    void 同时产出自包含html_内联数据与json一致_不含私有诊断与外链() throws Exception {
+        Path taskDir = writeTask();
+        Path runDir = tempDir.resolve("run-html");
+        Files.createDirectories(runDir.resolve("judge"));
+        Files.createDirectories(runDir.resolve("inbox"));
+        Files.createDirectories(runDir.resolve("traces"));
+        new RunMeta("run_h", "task-x", taskDir.toString(), "agent-v1", "cli", "m", "engine-test", Instant.EPOCH)
+                .save(runDir.resolve("meta.json"));
+        RunState state = new RunState(1, "run_h", "task-x", RunStatus.FAILED, "max_attempts_reached",
+                Instant.EPOCH, Instant.EPOCH.plusSeconds(1),
+                List.of(new RunState.AttemptRecord("attempt_001", true, 35.0, false,
+                        0, List.of("TOOL"), false, 10, Instant.EPOCH.plusMillis(500))),
+                "attempt_001", "hidden-fp", "workspace-fp");
+        RunStateStore.save(runDir.resolve("run_state.json"), state);
+        // private_notes 里故意放一段 HTML 与 expected 值：HTML 报告绝不能把它带出去。
+        JudgeResult judge = new JudgeResult(1, "task-x", "run_h", "attempt_001", "rules",
+                35.0, 100, false, Map.of("main", 35.0), List.of(),
+                List.of(new JudgeResult.FailedRule("TOOL", "答案字段缺失 <b>x</b>", "major", "main", 65, false)),
+                "还差一点", "TOOL [FAIL 0/100] 期望=SECRET-EXPECTED-42 <script>alert(1)</script>",
+                new JudgeResult.Reproducibility("engine-test", "1.0.0", "rules-fp", "submission-fp",
+                        "workspace-fp", Instant.EPOCH, true));
+        Jsons.json().writeValue(runDir.resolve("judge/attempt_001.judge.json").toFile(), judge);
+        Files.writeString(runDir.resolve("inbox/attempt_001.json"), "{}", StandardCharsets.UTF_8);
+        try (TraceLogger trace = TraceLogger.open(runDir.resolve("traces/trace.jsonl"), "run_h", SECRET)) {
+            trace.log(TraceEventType.RUN_STARTED, null, Map.of("task_id", "task-x", "agent", "agent-v1"));
+        }
+
+        ReportGenerator.generate(runDir, SECRET);
+
+        Path html = runDir.resolve("report/report.html");
+        assertThat(html).isRegularFile();
+        String page = Files.readString(html);
+        JsonNode inlined = HtmlRenderer.extractInlinedData(page);
+        JsonNode json = Jsons.json().readTree(Files.readString(runDir.resolve("report/report.json")));
+        assertThat(inlined).isEqualTo(json);
+        assertThat(page)
+                .doesNotContain("private_notes")
+                .doesNotContain("SECRET-EXPECTED-42")
+                .doesNotContain("<script>alert(1)</script>")
+                .doesNotContainPattern("(?i)<(script|link|img)[^>]+(src|href)=\"https?://")
+                .contains("agent-v1")
+                .contains("<title>");
+    }
+
     private Path writeTask() throws Exception {
         Path taskDir = tempDir.resolve("task-x");
         Files.createDirectories(taskDir.resolve("work"));
