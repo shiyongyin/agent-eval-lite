@@ -445,7 +445,7 @@ details.acc .accbody p,details.acc .accbody li{font-size:13.8px;color:#cbd5e1}
 <header class="app-header">
   <div class="brand" data-go="overview">
     <div class="logo">&gt;_</div>
-    <div class="brand-name">AgentEval-Lite<small>交互式导览 · v0.1.0</small></div>
+    <div class="brand-name">AgentEval-Lite<small>交互式导览 · v0.5.0</small></div>
   </div>
   <nav class="nav" id="mainNav">
     <button class="navbtn active" data-go="overview">总览</button>
@@ -483,7 +483,7 @@ details.acc .accbody p,details.acc .accbody li{font-size:13.8px;color:#cbd5e1}
         <div class="stat"><div class="v">15</div><div class="k">种判分 check</div></div>
         <div class="stat"><div class="v">17</div><div class="k">类留痕事件</div></div>
         <div class="stat"><div class="v">5</div><div class="k">个内置任务</div></div>
-        <div class="stat"><div class="v">159</div><div class="k">项测试</div></div>
+        <div class="stat"><div class="v">180</div><div class="k">项测试</div></div>
         <div class="stat"><div class="v">19</div><div class="k">项红队演练</div></div>
       </div>
 
@@ -698,7 +698,7 @@ details.acc .accbody p,details.acc .accbody li{font-size:13.8px;color:#cbd5e1}
   <p class="pdesc">不需要任何模型或 API Key。框架自带 5 个任务和「脚本回放的 Agent」，先看一遍完整闭环长什么样，再谈接入你自己的 Agent。</p>
 
   <h3 class="sec">前置条件：Java 17+ 与 Maven，其余什么都不用装</h3>
-  <div class="codeblock"><div class="codehead"><span class="cl">bash</span><button class="copybtn">复制</button></div><pre data-lang="bash"><code># 1. 构建（产物是单个 jar：target/agent-eval-lite-0.1.0-cli.jar）
+  <div class="codeblock"><div class="codehead"><span class="cl">bash</span><button class="copybtn">复制</button></div><pre data-lang="bash"><code># 1. 构建（产物是单个 jar：target/agent-eval-lite-0.5.0-cli.jar）
 mvn -q package
 
 # 2. 看看内置任务库（5 个任务，覆盖 5 类任务形态）
@@ -708,8 +708,9 @@ bin/agent-eval list
 bin/agent-eval run --task tasks/api-payload-001 --agent scripted \
     --script tasks/api-payload-001/samples/replay.yaml
 
-# 4. 看报告
-cat runs/api-payload-001/run_*/report/report.md</code></pre></div>
+# 4. 看报告（同目录还有 report.json 与可直接转发的单文件 report.html）
+cat runs/api-payload-001/run_*/report/report.md
+open runs/api-payload-001/run_*/report/report.html</code></pre></div>
 
   <h3 class="sec">终端演示（真实输出回放，点右上角播放）</h3>
   <div class="term" id="term1">
@@ -742,6 +743,24 @@ cat runs/api-payload-001/run_*/report/report.md</code></pre></div>
   </table></div>
   <div class="note"><span class="nt t-info">30 秒选型</span>评「人」或调试新任务 → <b>manual</b>；要确定性 CI 回归 → <b>scripted</b>；Agent 是命令行程序 → <b>cli</b>（不可信 / 强对抗再加 <code>--sandbox docker</code>）；Agent 是常驻服务 → <b>http</b>。四种方式可在 <code>agents.yaml</code> 里混搭对比。</div>
 
+  <h3 class="sec">推荐路径：先用脚手架自带的接入包装器，别急着手拼命令</h3>
+  <p><code>bin/agent-eval evalset init --id my-agent</code> 生成的 <code>scripts/run-agent.sh</code> 已内置三个 profile，会把题面全文、本轮提交文件的<b>绝对路径</b>、以及第二轮起的上一轮反馈（只取对外字段）拼成一段 prompt 交给 Agent；模型与额外参数用环境变量覆盖，不写死在 profile 里。</p>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>profile</th><th>调用</th><th>说明</th></tr>
+    <tr><td><code>claude</code></td><td><code>claude -p … --permission-mode acceptEdits --add-dir $AEL_INBOX</code></td><td>Claude Code 非交互模式；要让它跑命令（代码修复类任务）时用 <code>AEL_AGENT_EXTRA_ARGS='--dangerously-skip-permissions'</code>，建议只在 Docker 沙箱里这么做</td></tr>
+    <tr><td><code>codex</code></td><td><code>codex exec --sandbox workspace-write --add-dir $AEL_INBOX -c sandbox_workspace_write.network_access=true …</code></td><td>Codex CLI 非交互模式；放开 loopback 是为了 <code>agent-eval tool call</code> 能回连工具网关</td></tr>
+    <tr><td><code>custom</code></td><td>改脚本里的 <code>run_custom()</code></td><td>接自研 Agent；契约只有一条：结束前把提交写到 <code>$AEL_INBOX/$AEL_ATTEMPT_ID.json</code></td></tr>
+  </table></div>
+  <div class="codeblock"><div class="codehead"><span class="cl">bash</span><button class="copybtn">复制</button></div><pre data-lang="bash"><code># 单任务冒烟：--label 给这次 run 一个 Agent 标签（进入 report.json 的 run.agent 与 history 分组；对比版本时务必区分）
+bin/agent-eval run --task evalsets/my-agent/tasks/first-task-001 --agent cli \
+    --cmd 'bash "$AEL_RUN_DIR/../../../scripts/run-agent.sh" codex' \
+    --label codex-v1 --runs-root evalsets/my-agent/runs
+
+# 多 Agent 横评：agents.yaml 默认 baseline-scripted / current(claude) / candidate(codex)
+bin/agent-eval suite --tasks-root evalsets/my-agent/tasks --runs-root evalsets/my-agent/runs \
+    --agents-file evalsets/my-agent/agents.yaml --repeat 3</code></pre></div>
+  <div class="note"><span class="nt t-info">真实 Agent 实跑过</span>这套预设用 Codex CLI 在 7 个内置 / 演示任务上跑过（含 Docker 沙箱路径与工具网关回连），实跑记录与暴露的问题见 <code>docs/08</code> 附录 A。手拼 <code>--cmd</code> 的方式仍然可用，下面是它的全部占位符。</div>
+
   <h3 class="sec">对接全景：每个阶段谁做什么、你要设置什么</h3>
   <p>对接的全部工作量就是下表第四列——框架把其余环节都包了。三方分工一目了然：</p>
   <div class="tblwrap"><table class="tbl">
@@ -749,8 +768,8 @@ cat runs/api-payload-001/run_*/report/report.md</code></pre></div>
     <tr><td><b>启动前</b></td><td>校验任务 → 复制 work/ 为私有 workspace（记指纹）→ 渲染 instructions.md → 拉起签名留痕与工具网关</td><td>—</td><td>选任务目录 <code>--task</code>；选接入方式 <code>--agent</code>；cli 填 <code>--cmd</code> 模板 / http 填 <code>--endpoint</code>；不可信 Agent 加 <code>--sandbox docker --sandbox-image</code></td></tr>
     <tr><td><b>每轮开始</b></td><td>把「说明 + 上轮反馈」交给 Agent（cli：占位符/环境变量注入并启动进程；http：POST 任务 JSON）</td><td>读 instructions.md 与 feedback，理解题目与改进方向</td><td>（可选）轮次与预算在 task.yaml：<code>max_attempts</code>、<code>attempt_timeout_minutes</code></td></tr>
     <tr><td><b>干活中</b></td><td>看住边界：工具白名单网关、超时强杀、全程签名留痕</td><td>在 workspace 里读写干活；要用任务工具时执行 <code>agent-eval tool call</code> 并记下 call_id</td><td>（可选）任务用真实工具时设 <code>AEL_TOOL_MODE=live</code> 录制</td></tr>
-    <tr><td><b>提交</b></td><td>收取 inbox 文件 → 信封+分型双 Schema 校验 → 隐藏判分 → 写受控反馈；未达线且有余量则续轮</td><td><b>把提交 JSON 写进 <code>inbox/attempt_NNN.json</code></b>（唯一必须实现的动作）</td><td>—</td></tr>
-    <tr><td><b>结束后</b></td><td>选最佳轮次 → 生成 report.json/md → 落盘签名密钥供复核</td><td>—</td><td>看报告；接 CI 加 <code>--fail-on-not-passed</code>；要看板则 <code>export</code> 推 OTLP</td></tr>
+    <tr><td><b>提交</b></td><td>收取 inbox 文件 → 信封+分型双 Schema 校验 → 隐藏判分 → 写受控反馈；未达线且有余量则续轮</td><td><b>把提交 JSON 写进 <code>$AEL_INBOX/attempt_NNN.json</code></b>（唯一必须实现的动作；用绝对路径——按 cwd 相对解析会写进 workspace/inbox/ 而不算提交）</td><td>—</td></tr>
+    <tr><td><b>结束后</b></td><td>选最佳轮次 → 生成 report.json / md / html → 落盘签名密钥供复核</td><td>—</td><td>看报告；接 CI 加 <code>--fail-on-not-passed</code>；要看板则 <code>export</code> 推 OTLP</td></tr>
   </table></div>
 
   <h3 class="sec">命令生成器（点选组合，直接复制）</h3>
@@ -839,7 +858,7 @@ cat runs/api-payload-001/run_*/report/report.md</code></pre></div>
   <div class="codeblock"><div class="codehead"><span class="cl">bash</span><button class="copybtn">复制</button></div><pre data-lang="bash"><code># Agent 侧调用（需要环境变量 AEL_RUN_DIR，cli 模式已自动注入）
 bin/agent-eval tool call user.lookup --input '{"user_id":"u_1001"}'
 # → {"call_id":"tc_a1b2…","output":{"level":"GOLD",…}}   应答来自任务 hidden/tools/ 的应答库（Agent 看不到库本身）</code></pre></div>
-  <div class="note warn"><span class="nt t-warn">评不可信 Agent？开沙箱</span><code>--sandbox docker</code> 会把 Agent 命令包进容器，容器里<b>只有</b> workspace、inbox、feedback、instructions 四个挂载点——隐藏答案根本不在容器文件系统里，偷看无从谈起；默认断网。镜像需自带 Agent 运行环境（用工具时还需 JRE）。</div>
+  <div class="note warn"><span class="nt t-warn">评不可信 Agent？开沙箱</span><code>--sandbox docker</code> 会把 Agent 命令包进容器，容器里<b>只有</b> workspace、inbox、feedback、instructions 四个挂载点——隐藏答案根本不在容器文件系统里，偷看无从谈起；默认断网。镜像需自带 Agent 运行环境（用工具时还需 JRE）——仓库提供了配方 <code>docker/agent-cli.Dockerfile</code>（Claude Code + Codex CLI + JRE + 容器内 <code>ael-run-agent</code> / <code>agent-eval</code> 垫片，不含凭证）：<code>docker build -f docker/agent-cli.Dockerfile -t ael-agent-cli .</code>，然后 <code>--sandbox-image ael-agent-cli --cmd 'ael-run-agent codex'</code>。凭证经 <code>--sandbox-docker-arg=-e --sandbox-docker-arg=OPENAI_API_KEY</code> 透传（一个 token 一个参数），要调模型 API 必须显式 <code>--sandbox-network bridge</code>。</div>
 </div>
 
 <!-- ========== U3 读懂反馈与报告 ========== -->
@@ -876,7 +895,7 @@ bin/agent-eval tool call user.lookup --input '{"user_id":"u_1001"}'
       <div class="tnode" data-name="feedback/" data-note="框架写出的受控反馈（attempt_NNN.feedback.json）。Agent 只读。粒度可配，期望值与 private_notes 永不出现。"><span class="tn">├── feedback/</span> <span class="badge b-agent tb">Agent 只读</span></div>
       <div class="tnode" data-name="judge/" data-note="完整评分结果（attempt_NNN.judge.json），含 private_notes、规则命中细节、可复现指纹。评审禁区，Agent 不可见。llm_rubric 的原始请求/响应也全量存档在这里。"><span class="tn">├── judge/</span> <span class="badge b-hidden tb">评审禁区</span></div>
       <div class="tnode" data-name="traces/trace.jsonl" data-note="append-only 全过程留痕，17 类事件（生命周期/工具/提交/评分/反馈/恢复/错误）。每条框架事件用每 run 私密密钥 HMAC 签名，判分只认可核验的事件。"><span class="tn">├── traces/trace.jsonl</span> <span class="badge b-trace tb">签名留痕</span></div>
-      <div class="tnode" data-name="report/" data-note="终局报告 report.json（机器可读）+ report.md（人读）：最终成绩、维度得分、轮次轨迹、工具使用、安全项、可复现指纹。可用 agent-eval report 从工件随时重建（纯读幂等）。"><span class="tn">├── report/report.md · report.json</span> <span class="badge b-frame tb">评估者</span></div>
+      <div class="tnode" data-name="report/" data-note="终局报告 report.json（机器可读）+ report.md（人读）+ report.html（同目录 JSON 的只读视图：数据内联、零外链，可直接发给不看终端的同事；不读 judge/ 与 hidden/，也不新增字段）：最终成绩、维度得分、轮次轨迹、工具使用、安全项、可复现指纹。可用 agent-eval report 从工件随时重建（纯读幂等）。"><span class="tn">├── report/report.md · report.json · report.html</span> <span class="badge b-frame tb">评估者</span></div>
       <div class="tnode" data-name="agent-logs/" data-note="Agent 进程的 stdout/stderr 落盘（cli 模式）。canary 泄露探针的扫描范围覆盖这里——把隐藏内容 dump 到 stdout 会被抓到。"><span class="tn">├── agent-logs/</span> <span class="badge b-frame tb">评估者</span></div>
       <div class="tnode" data-name="meta.json / run_state.json" data-note="run 元数据（agent/model/时间/引擎版本/指纹）与断点续跑快照。每轮原子落盘，进程被杀后 run --resume 可续跑；恢复前校验 hidden 指纹，被篡改则 INTEGRITY_BROKEN 熔断。"><span class="tn">└── meta.json · run_state.json</span> <span class="badge b-frame tb">框架</span></div>
     </div>
@@ -891,7 +910,7 @@ bin/agent-eval tool call user.lookup --input '{"user_id":"u_1001"}'
 | attempt_002 | 是   | 100.0 | 是   | —                                            |   6 |
 
 ## 可复现性
-- 引擎：agent-eval-lite/0.1.0     - 规则版本：1.0.0
+- 引擎：agent-eval-lite/0.5.0     - 规则版本：1.0.0
 - hidden 指纹：3b8ffdb11faa       - workspace 初始指纹：c253cef275f7
 复核方式：agent-eval judge --task &lt;任务目录&gt; --submission inbox/&lt;attempt&gt;.json</code></pre></div>
 
@@ -899,6 +918,15 @@ bin/agent-eval tool call user.lookup --input '{"user_id":"u_1001"}'
     <div class="card tight"><h4>怀疑分数不对？离线复算</h4><p><code>bin/agent-eval judge --task tasks/xxx --submission sub.json</code> 可随时对任意历史提交重评——相同输入必得相同分数（用了 <code>llm_rubric</code> 的任务会如实标注 <code>deterministic=false</code>）。</p></div>
     <div class="card tight"><h4>想看过程细节？导出到看板</h4><p><code>bin/agent-eval export --run runs/xxx/run_yyy</code> 把留痕导出为 OTLP/OpenInference（run→AGENT / attempt→CHAIN / tool_call→TOOL 三层 span），Phoenix / Langfuse / OTel Collector 可直接摄取。</p></div>
   </div>
+
+  <h3 class="sec">三种"没通过"要分开读</h3>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>报告里看到</th><th>先判断</th></tr>
+    <tr><td><code>FAILED</code> 且有 <code>valid=true</code> 的有分轮次</td><td>Agent 能力问题：看 <code>best_attempt.dimension_breakdown</code> 与 <code>failed_rules</code> 的对外文案</td></tr>
+    <tr><td><code>FAILED</code> 且全部轮次 <code>valid=false</code>、score 为 null</td><td>接入 / 提交契约问题，不是能力：看 <code>feedback/attempt_001.feedback.json</code> 的 <code>schema_errors</code>——常见是提交写到了 workspace/inbox/（反馈会点名错位文件并给出正确绝对路径），或轮次超时被杀（<code>attempt_timeout_minutes</code> 对推理型模型偏紧）</td></tr>
+    <tr><td><code>ERROR</code> / <code>INTEGRITY_BROKEN</code></td><td>框架或环境故障 / hidden 被改动，不计入 Agent 成绩</td></tr>
+    <tr><td><code>PENDING_HUMAN</code></td><td>Agent 提交时标了 <code>needs_human_review:true</code>。suite 计为未稳定通过并单列在 <code>risk_summary.pending_human_tasks</code>，不会自动转 PASSED；人工复核后用 <code>agent-eval judge</code> 离线重判，结论写到 run 目录 <code>review/decision.json</code> 留痕（任何报告都不读它改判分）</td></tr>
+  </table></div>
 
   <h3 class="sec">退出码：接 CI 就靠它</h3>
   <div class="tblwrap"><table class="tbl">
@@ -933,6 +961,7 @@ bin/agent-eval tool call user.lookup --input '{"user_id":"u_1001"}'
     <div class="card tight"><h4><code>ael-analyze-results</code> <span class="badge b-frame">分析</span></h4><p><b>做什么：</b>跑完后只读解读 run/suite/history，定位掉分归因。<br><b>何时点它：</b>「为什么没过 / 差在哪」——给出挂了哪条 rule、是能力还是接入契约问题，附可验证的改进方向。</p></div>
     <div class="card tight"><h4><code>ael-verify</code> <span class="badge b-frame">验证</span></h4><p><b>做什么：</b>改完代码 / 任务 / 文档后，按改动范围选最便宜的验证闸。<br><b>何时点它：</b>「提交前检查」——从单测到 ci-smoke 给出够用但不过度的验证命令组合。</p></div>
   </div>
+  <div class="note"><span class="nt t-info">框架自己也这么干</span>0.5.0 这一轮就是按 <code>docs/08-投入使用路线设计.md</code> 的优先级拆成 <code>docs/tasks/TASK-USE-00…09</code> 十张任务卡（frontmatter 带 dependsOn / dodCommands），逐卡 TDD 交付，再用真实 Agent 实跑验证；实跑暴露并修掉的框架问题记录在 docs/08 附录 A。你的团队任务也可以复用这套卡片协议交给 AI 助手。</div>
 
   <h3 class="sec">任务目录契约（点击条目看说明）</h3>
   <div class="treewrap">
@@ -1137,8 +1166,11 @@ bin/agent-eval suite --agents-file agents.yaml --repeat 2
 # 按分层批跑子集（任务 task.yaml 里的 tier: smoke/regression/security/domain）
 bin/agent-eval suite --tier smoke --fail-on-not-passed
 
-# 跨 run 趋势：汇总历次 report.json → 任务×Agent 的通过率/分数趋势（只读离线）
-bin/agent-eval history --runs-root runs</code></pre></div>
+# 跨 run 趋势：汇总历次 report.json → 任务×Agent 的通过率/分数趋势（只读离线；Agent 按 --label 分行）
+bin/agent-eval history --runs-root runs
+
+# 三类报告都同时产出 .json / .md / .html：suite_report.html 的任务×Agent 矩阵格子可点进对应 run 的 report.html，
+# 单文件、零外链，直接发给不看终端的人；history.html 同理。</code></pre></div>
 
   <div class="codeblock"><div class="codehead"><span class="cl">yaml · agents.yaml（scripted / cli / http 可混搭）</span><button class="copybtn">复制</button></div><pre data-lang="yaml"><code>agents:
   - label: baseline-scripted
@@ -1169,11 +1201,11 @@ bin/agent-eval history --runs-root runs</code></pre></div>
     <li>Agent 在提交信封里自报 <code>usage</code>（model / token / cost）时，单 run 与对比面板会聚合出成本列——<b>自报数据只做 ROI 参考，不参与评分</b>，且以签名留痕事件记录。</li>
   </ul>
 
-  <h3 class="sec">接进 CI：四道闸模板</h3>
-  <p>仓库自带 <code>.github/workflows/ci.yml</code> 与 <code>bin/ci-smoke.sh</code>，本地/CI 同口径：</p>
+  <h3 class="sec">接进 CI：框架自证四道闸 + 团队测评集的 smoke 门禁</h3>
+  <p>两条 CI 路径分开看。<b>团队自己的测评集</b>用 <code>evalset init</code> 生成的 <code>evalsets/&lt;set&gt;/ci/evalset-smoke.yml</code>（复制到 <code>.github/workflows/</code>）：<code>smoke-scripted-baseline</code> 每个 PR 都跑（validate + scripted 回放 smoke 层，证明任务本身没坏，不花模型费用）；<code>smoke-real-agents</code> 只手动触发，用 <code>agents.yaml</code> 的真实 Agent 跑 <code>--tier smoke --repeat 2</code>，凭证走 <code>secrets.*</code>。<b>框架仓库自身</b>用 <code>.github/workflows/ci.yml</code> 与 <code>bin/ci-smoke.sh</code>，本地/CI 同口径：</p>
   <ol class="steps">
     <li><code>bin/gen-codemap.sh --check</code> —— CODEMAP 漂移门禁：代码地图与源码不一致即失败（毫秒级）。</li>
-    <li><code>mvn clean verify</code> —— 159 项测试 + Checkstyle + JaCoCo 覆盖率下限 0.75。</li>
+    <li><code>mvn clean verify</code> —— 180 项测试 + Checkstyle + JaCoCo 覆盖率下限 0.75。</li>
     <li><code>suite --fail-on-not-passed</code> —— 任一任务的 fail→pass 回放闭环被破坏即退出码 3。</li>
     <li><code>redteam/run_all.sh</code> —— 红队演练 fail-closed（Docker 就绪 19 项全 DEFENDED）：防线退化、观测偏离、报告缺失任一发生即失败。</li>
   </ol>
@@ -1219,12 +1251,17 @@ bin/agent-eval history --runs-root runs</code></pre></div>
       <li>把期望值写进 <code>feedback_fail</code> 文案或 work/ → 泄题（lint 管不了文案，靠自检与 canary）</li>
       <li>llm 检查权重 &gt;30% 或设 blocking → deep lint 拒</li>
       <li>录制的应答库忘拷进 <code>hidden/tools/</code> → replay 模式该工具调用 fail-closed 失败</li>
+      <li>题面让 Agent 看 <code>docs/api.md</code>，判分器却只认另一种路径写法 → 真实 Agent 按题面引用却白丢分；材料引用统一按"相对工作区"解析</li>
     </ul></div>
     <div class="card tight"><h4>接入 / 运行时</h4><ul class="plain">
       <li>提交文件名必须 <code>attempt_NNN.json</code> 且与信封 <code>attempt_id</code> 一致，对不上判 invalid</li>
       <li>信封 <code>summary</code> 太短（&lt;8 字符）→ Schema 校验失败</li>
       <li><code>tool_calls_used[].call_id</code> 编造 → 留痕核验一票否决</li>
-      <li>Docker 沙箱镜像没带 Agent 运行环境 / JRE → 容器内起不来（退出码前移报错）</li>
+      <li>Docker 沙箱镜像没带 Agent 运行环境 / JRE → 容器内起不来（用 <code>docker/agent-cli.Dockerfile</code> 构建即可）</li>
+      <li><code>--sandbox-docker-arg '-e KEY'</code> 被当成一个带空格的 token，凭证其实没传进去 → 写成 <code>--sandbox-docker-arg=-e --sandbox-docker-arg=KEY</code></li>
+      <li>Agent 把提交写到 <code>workspace/inbox/</code>（按 cwd 相对解析）→ 不算提交；反馈会点名错位文件，接入包装器已改为给绝对路径</li>
+      <li>推理型模型在 5 分钟 <code>attempt_timeout_minutes</code> 内写不完长输出 → 三轮全被超时强杀、记成"无提交"；生成型任务给 ≥10 分钟</li>
+      <li>多版本 Agent 都用 cli 接入却没给 <code>--label</code> → history 里合成一行 <code>cli</code>，看不出版本趋势</li>
       <li>run 进行中手改 hidden/ → INTEGRITY_BROKEN 熔断（退出码 2）</li>
     </ul></div>
   </div>
@@ -1407,7 +1444,8 @@ bin/agent-eval history --runs-root runs</code></pre></div>
     <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 3</span>真实信号 <span class="pill p-ok">已落地</span></h4><p>真实工具 http 后端（白名单 + 录制→回放晋升）、auto-eval 周期采样、llm_rubric LLM 判分（强约束）。</p></div>
     <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 4</span>硬隔离 <span class="pill p-ok">Docker Runner 已落地</span></h4><p>--sandbox docker 容器强隔离，红队外科式偷看 + symlink/find 逃逸全部 DEFENDED，登记基线归 0。</p></div>
     <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">Phase 4.5</span>分层与结果治理 <span class="pill p-ok">已落地</span></h4><p>task.yaml 可选 tier/labels 分层元数据 + suite --tier 按层批跑；agent-eval history 只读聚合历次 report.json，产出跨 run/Agent/版本趋势。</p></div>
-    <div class="tl-item pending"><div class="tl-dot"></div><h4><span class="ph">待办</span>持久化结果仓库与可视化看板 <span class="pill p-mid">规划中</span></h4><p>当前由报告文件 + suite 矩阵 + history 趋势 + OTLP 导出到 Phoenix/Langfuse 补位。</p></div>
+    <div class="tl-item"><div class="tl-dot"></div><h4><span class="ph">0.5.0</span>从"可用"到"在用" <span class="pill p-ok">已落地</span></h4><p>按 docs/08 路线与十张任务卡 TDD 交付：接入包装器预设（claude / codex / custom，自动注入上一轮反馈）、Agent CLI 沙箱镜像配方、--label 进入 meta/report/trace/history、自包含 HTML 报告（run / suite / history）、evalset CI 模板、PENDING_HUMAN 处置口径；并用真实 Codex 实跑 7 个任务，修掉 stdin 挂起、PATH 垫片、错位提交反馈、codex 沙箱网络、ScriptJudge 超时、evidence 路径契约六个实际问题。</p></div>
+    <div class="tl-item pending"><div class="tl-dot"></div><h4><span class="ph">不做</span>常驻看板服务 / 结果仓库 <span class="pill p-mid">按 docs/04 判定负 ROI</span></h4><p>由同目录 .html 报告 + suite 矩阵 + history 趋势 + OTLP 导出到 Phoenix/Langfuse 补位；判分事实源始终是 run 目录内的签名 trace 与工件。</p></div>
   </div>
 </div>
       </div>
@@ -1438,7 +1476,7 @@ bin/agent-eval history --runs-root runs</code></pre></div>
     <tr><td>CLI</td><td>picocli 4.7.7</td><td>11 个子命令：run / suite / judge / report / export / validate / list / history / evalset / tool / task</td></tr>
     <tr><td>序列化</td><td>Jackson databind + yaml 2.19</td><td>task.yaml、规则、提交、trace 全走它</td></tr>
     <tr><td>Schema 校验</td><td>networknt json-schema-validator 1.5.6</td><td>draft 2020-12；信封 + 6 分型 + judge 输出 + trace 事件共 9 个内置 schema</td></tr>
-    <tr><td>日志 / 测试</td><td>SLF4J simple · JUnit 5 + AssertJ</td><td>159 项测试；Docker 相关端到端用例无 Docker 环境自动跳过</td></tr>
+    <tr><td>日志 / 测试</td><td>SLF4J simple · JUnit 5 + AssertJ</td><td>180 项测试；Docker 相关端到端用例无 Docker 环境自动跳过</td></tr>
     <tr><td>刻意不引入</td><td>Spring · 数据库 · HTTP 服务框架</td><td>所有状态落文件系统；进程内唯一常驻服务是 loopback 工具网关</td></tr>
   </table></div>
 
@@ -1549,7 +1587,7 @@ case "llm_rubric"             -&gt; LlmRubricJudge.run(def, input);  // 唯一�
   </ol>
   <div class="codeblock"><div class="codehead"><span class="cl">jsonl · traces/trace.jsonl 真实事件行</span><button class="copybtn">复制</button></div><pre data-lang="json"><code>{"event_id":"evt_000001","run_id":"run_20260707_093454_sfpj","seq":1,"timestamp":"2026-07-07T01:34:54.848Z",
  "type":"run_started","payload":{"agent":"scripted","task_id":"api-payload-001",
- "engine_version":"agent-eval-lite/0.1.0","workspace_fingerprint":"c253cef2…","hidden_fingerprint":"3b8ffdb1…"},
+ "engine_version":"agent-eval-lite/0.5.0","workspace_fingerprint":"c253cef2…","hidden_fingerprint":"3b8ffdb1…"},
  "_sig":"db2c74bf88832294924febd83beb9829bc2644829e187953629ab2410db8c6d4"}</code></pre></div>
   <p style="font-size:13.5px;color:var(--muted)">17 类事件覆盖全生命周期：run_started / agent_started / agent_finished / tool_call / shell_command / submission_received / submission_invalid / judge_started / judge_completed / auto_eval_sampled / feedback_delivered / stop_hook_triggered / resume / error / usage_recorded / final_selection / run_completed。<code>OtlpTraceExporter</code> 把它们确定性映射为三层 span（trace/span id 由 run/attempt/call id 派生，幂等重推不分叉）。</p>
 
@@ -1662,7 +1700,7 @@ case "llm_rubric"             -&gt; LlmRubricJudge.run(def, input);  // 唯一�
       深入阅读：仓库 <code>README.md</code> · <code>docs/01</code> 代码库理解 · <code>docs/02</code> EdgeBench/SForge 调研 · <code>docs/03</code> 设计方案 · <code>docs/04</code> 成熟框架调研与 ROI
     </div>
     <div style="text-align:right">
-      引擎 <code>agent-eval-lite/0.1.0</code> · Java 17 + Maven<br>
+      引擎 <code>agent-eval-lite/0.5.0</code> · Java 17 + Maven<br>
       本页内容基于仓库当前代码与真实运行产物生成
     </div>
   </div>
@@ -1877,11 +1915,12 @@ const CMD_TPL = {
   },
   cliSandbox: (net) => ({
     cmd: `bin/agent-eval run --task tasks/code-fix-001 --agent cli --sandbox docker \\
-    --sandbox-image my-agent-image:latest \\${net ? "\n    --sandbox-network bridge \\" : ""}
-    --cmd 'claude -p "$(cat {instructions})" --dangerously-skip-permissions'`,
+    --sandbox-image ael-agent-cli \\${net ? "\n    --sandbox-network bridge \\" : ""}
+    --sandbox-docker-arg=-e --sandbox-docker-arg=ANTHROPIC_API_KEY \\
+    --cmd 'ael-run-agent claude' --label claude-docker`,
     note: net
       ? "bridge 模式下容器经 host.docker.internal 回连宿主的常驻工具网关（token 纵深防御）；镜像需自带 JRE 供 agent-eval tool call 使用（--sandbox-tool-jar 默认自动探测挂入）。"
-      : "容器只挂载 workspace/inbox/feedback/instructions 四个点，hidden 根本不在容器里；默认 --network none 全程断网。镜像须自带 Agent 命令所需环境；可用 --sandbox-docker-arg 透传如 --memory=512m。"
+      : "容器只挂载 workspace/inbox/feedback/instructions 四个点，hidden 根本不在容器里；默认 --network none 全程断网（要调模型 API 就得显式 bridge）。ael-agent-cli 用 docker/agent-cli.Dockerfile 构建，自带 Claude Code / Codex CLI / JRE 与 ael-run-agent 包装器；--sandbox-docker-arg 一个 token 一个参数，不要写成 '-e KEY'。"
   }),
   http: {
     cmd: `bin/agent-eval run --task tasks/api-payload-001 --agent http \\
