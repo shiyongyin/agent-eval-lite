@@ -64,8 +64,8 @@ scoring:
       weight: 10
 
 runtime:
-  timeout_minutes: 20
-  attempt_timeout_minutes: 5
+  timeout_minutes: 30
+  attempt_timeout_minutes: 10
   allow_multi_submit: true
   auto_eval_interval_seconds: 0
   resume_enabled: true
