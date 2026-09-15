@@ -279,6 +279,34 @@ class SuiteRunnerTest {
                 .containsExactlyInAnyOrder("agent-current", "agent-candidate");
     }
 
+    @Test
+    void agent请求人工复核_suite计为未稳定通过_并单列pending_human_tasks() throws Exception {
+        // 提交内容合格，但 Agent 主动标 needs_human_review:true → run 终态 PENDING_HUMAN。
+        Path sample = Path.of("tasks/api-payload-001/samples/attempt-pass.json").toAbsolutePath();
+        String cmd = "sed -e \"s/[{]attempt_id[}]/${AEL_ATTEMPT_ID}/\" "
+                + "-e 's/\"needs_human_review\": *false/\"needs_human_review\": true/' '" + sample
+                + "' > \"${AEL_INBOX}/${AEL_ATTEMPT_ID}.json\"";
+        SuiteRunner.AgentSpec agent = SuiteRunner.AgentSpec.cli("asks-human", cmd);
+
+        SuiteRunner.SuiteResult result = SuiteRunner.run(
+                Path.of("tasks"), runsRoot, null, Set.of("api-payload-001"), agent, 1);
+
+        assertThat(statusOf(result, "api-payload-001")).isEqualTo(RunStatus.PENDING_HUMAN);
+        assertThat(result.allPassed()).isFalse();
+        assertThat(result.erroredCount()).as("人工复核不是框架故障").isZero();
+
+        Path reportJson = SuiteRunner.writeReports(result, outDir);
+        JsonNode risk = Jsons.json().readTree(Files.readString(reportJson)).path("risk_summary");
+        assertThat(risk.path("pending_human_tasks")).extracting(JsonNode::asText)
+                .containsExactly("api-payload-001");
+        assertThat(risk.path("not_passed_tasks")).extracting(JsonNode::asText)
+                .containsExactly("api-payload-001");
+        assertThat(risk.path("action_required").asBoolean()).isTrue();
+
+        String md = Files.readString(outDir.resolve("suite_report.md"));
+        assertThat(md).contains("待人工复核任务").contains("api-payload-001");
+    }
+
     /**
      * 真实 cli Agent 命令：把任务自带的合格提交样例替换 attempt_id 后写入 inbox。
      *

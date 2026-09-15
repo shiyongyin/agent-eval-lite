@@ -682,10 +682,15 @@ public final class SuiteRunner {
         ArrayNode notPassed = summary.putArray("not_passed_tasks");
         ArrayNode setupErrors = summary.putArray("setup_error_tasks");
         ArrayNode flaky = summary.putArray("flaky_tasks");
+        ArrayNode pendingHuman = summary.putArray("pending_human_tasks");
         Map<String, Integer> byRule = new TreeMap<>();
         for (TaskResult r : result.results()) {
             if (!r.passAtK()) {
                 notPassed.add(r.taskId());
+            }
+            // Agent 主动请求人工复核：不算通过、不算故障，单列出来等人处理；人工结论不回写判分。
+            if (r.runs().stream().anyMatch(a -> a.status() == RunStatus.PENDING_HUMAN)) {
+                pendingHuman.add(r.taskId());
             }
             if (r.error() != null || r.runs().stream().anyMatch(a ->
                     a.status() == RunStatus.ERROR || a.status() == RunStatus.INTEGRITY_BROKEN)) {
@@ -865,6 +870,11 @@ public final class SuiteRunner {
             sb.append("- 框架故障 / 完整性异常任务：").append(formatTaskList(risk.path("setup_error_tasks"))).append("\n");
             sb.append("- flaky 任务（pass@1 过但 pass^k 未过）：")
                     .append(formatTaskList(risk.path("flaky_tasks"))).append("\n");
+        }
+        if (risk.path("pending_human_tasks").size() > 0) {
+            sb.append("- 待人工复核任务（Agent 标 needs_human_review，不计通过；复核后用 "
+                    + "`agent-eval judge` 离线重判并在 run 目录 `review/decision.json` 留痕）：")
+                    .append(formatTaskList(risk.path("pending_human_tasks"))).append("\n");
         }
         JsonNode rules = risk.path("failed_rules_by_id");
         if (rules.isObject() && !rules.isEmpty()) {

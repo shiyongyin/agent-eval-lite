@@ -209,7 +209,7 @@ bin/agent-eval evalset init --id my-agent
 1. 先做 5-10 个 `smoke` 任务，保证每次改 Agent 能快速挡退化。
 2. 再扩到 20-50 个 `regression` 任务，合并前或发版前跑。
 3. 每个任务进入门禁前，用 `ael-review-task-quality` 或 [docs/07-任务质量清单.md](docs/07-任务质量清单.md) 审一遍。
-4. 用 `suite_report.md` 的“小团队操作摘要”先看未稳定通过任务、故障任务、flaky 任务和失败规则热点。
+4. 用 `suite_report.md` 的“小团队操作摘要”先看未稳定通过任务、故障任务、flaky 任务、待人工复核任务（Agent 标 `needs_human_review`，不计通过）和失败规则热点。
 
 详细路径见 [docs/06-小团队落地指南.md](docs/06-小团队落地指南.md)。可复制模板见 [evalsets/_template](evalsets/_template)。
 
