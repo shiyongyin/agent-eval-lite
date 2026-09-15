@@ -310,6 +310,12 @@ bin/agent-eval export --run runs/xxx/run_yyy
 
 仍需注意：Docker 强度取决于宿主 Docker 配置和镜像可信度；`llm_rubric` 是低权重主观信号，不应用作一票否决。
 
+几条刻意收窄的口径，读报告时不要放大：
+
+- `usage`（token / 成本）是 Agent 在提交信封里**自报**的，只做 ROI 参考，不参与评分，框架也不防 Agent 谎报。
+- OTLP / OpenInference 导出是给看板看的**观察副本**；判分事实源始终是 run 目录里的 JSONL + HMAC trace，看板里的数据不会回流影响任何结论。
+- `--label` 是报告与 history 的分组键，不参与判分。
+
 更多细节见 [redteam/audit-report.md](redteam/audit-report.md) 和 [SECURITY.md](SECURITY.md)。
 
 ## AI 协作 Skills

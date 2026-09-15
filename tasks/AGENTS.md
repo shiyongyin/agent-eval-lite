@@ -23,6 +23,17 @@ tasks/<task-id>/
 - `tier` ∈ smoke / regression / security / domain（批跑过滤元数据，不影响判分）。
 - 深度 lint 前移的错误：`expected_from` 断链、`schema_file` 缺失、check 引用 `allowed_tools` 白名单外的工具、`llm_rubric` 有效权重 >30% 或设 blocking。
 
+## 工具轨迹类 check 的语义（tool_call_required / world_state）
+
+两者都只统计 trace 里 **HMAC 可核验且 success=true** 的事件；Agent 在提交里自述"调了工具"不算数。
+
+- `tool_call_required`：本轮至少有一次对指定工具的真实调用，且提交 `tool_calls_used[].call_id` 能对上 trace。
+- `world_state`：把 `tools` 列出的**写工具**的真实调用按 `{tool, input}` 折叠成"世界终态"，与 `expected` / `expected_from` 比对。评的是"实际写进去了什么"，不是"提交里说了什么"。
+  - `scope`（默认 `attempt`）：只折叠本轮的写操作，与"失败→反馈→重试"自洽，上一轮写错不会永久毒化后面的轮次；`run` 折叠整个 run 的写操作，适合"只能开一次卡"这类不可重复的副作用。
+  - `order_sensitive`（默认 `false`）：多重集比较——每条实际写操作只消耗一条期望，多写、少写、重复写都算不符；`true` 时还要求顺序逐位相等。
+  - 期望终态属于 hidden：放 `hidden/expected/` 用 `expected_from` 引用；`feedback_fail` 只能说"终态与要求不符"，不能透露期望的 input。
+  - 涉及真实状态变化的任务优先用 `world_state` 而不是只看提交字段（参考 `tasks/tool-call-001` 的 `FINAL_WORLD_STATE`）。
+
 ## hidden 防泄露检查单（安全红线，逐条自查）
 
 1. 期望值只放 `hidden/expected/`，规则里用 `expected_from: "expected/x.json#/指针"` 引用，绝不写进 `task.yaml` 对外字段。

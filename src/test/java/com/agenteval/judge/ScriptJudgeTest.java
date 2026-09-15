@@ -43,10 +43,14 @@ class ScriptJudgeTest {
     }
 
     private TaskSpec specWithScript(String scriptRel) {
+        return specWithScript(scriptRel, 30);
+    }
+
+    private TaskSpec specWithScript(String scriptRel, int timeoutSeconds) {
         return new TaskSpec(1, "task", "脚本任务", TaskType.GENERIC, "", "brief",
                 List.of(), List.of(),
                 new TaskSpec.Submit("json", "builtin:generic", 3, 0),
-                new TaskSpec.JudgeSpec(JudgeType.SCRIPT, null, scriptRel, 30,
+                new TaskSpec.JudgeSpec(JudgeType.SCRIPT, null, scriptRel, timeoutSeconds,
                         new TaskSpec.Feedback(FeedbackLevel.FAILED_RULES, true)),
                 new TaskSpec.Scoring(100, 80, SelectionPolicy.BEST_SCORE,
                         List.of(new TaskSpec.Dimension("main", 100))),
@@ -95,6 +99,22 @@ class ScriptJudgeTest {
         assertThatThrownBy(() -> ScriptJudge.run(input(specWithScript("hidden/broken.sh")), Set.of("main")))
                 .isInstanceOf(JudgeException.class)
                 .hasMessageContaining("退出码 3");
+    }
+
+    @Test
+    void 脚本超时被强杀_按评审设施故障抛出_不产出分数() throws Exception {
+        // sleep 远大于超时预算，避免边界值在慢机器上抖动。
+        Files.writeString(taskDir.resolve("hidden/slow.sh"), """
+                #!/bin/sh
+                sleep 30
+                echo '{"checks": []}'
+                """, StandardCharsets.UTF_8);
+        long start = System.nanoTime();
+        assertThatThrownBy(() -> ScriptJudge.run(input(specWithScript("hidden/slow.sh", 1)), Set.of("main")))
+                .isInstanceOf(JudgeException.class)
+                .hasMessageContaining("超时");
+        // 超时后必须立刻返回，而不是等脚本自然结束（30s）。
+        assertThat((System.nanoTime() - start) / 1_000_000_000L).isLessThan(10);
     }
 
     @Test

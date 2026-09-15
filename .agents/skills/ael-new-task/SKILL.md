@@ -17,7 +17,7 @@ description: 在 AgentEval-Lite 仓库新增或修改评估任务（内置 tasks
 4. 写 `hidden/judge.rules.yaml`：期望值放 `hidden/expected/` 并用 `expected_from: "expected/x.json#/指针"` 引用；`feedback_fail` 只说「哪里不对、往哪个方向查」，禁含期望值。check 类型选择：
    - 期望是精确值 → `jsonpath_equals`（首选）
    - 期望是关键点清单、允许部分得分 → `list_coverage`
-   - 必须验证真实工具调用/终态 → 工具轨迹类 check（只认 HMAC 可核验事件）
+   - 必须验证真实工具调用/终态 → 工具轨迹类 check（只认 HMAC 可核验事件）：有写操作用 `world_state`（`tools` 列写工具、期望终态走 `expected_from`；`scope: attempt|run` 决定折叠本轮还是全 run，`order_sensitive` 默认 false 为多重集比较），语义细节见 `tasks/AGENTS.md`「工具轨迹类 check 的语义」
    - 三者都不行的主观维度才用 `llm_rubric`（有效权重 ≤30%、禁 blocking，validate 会拦）
 5. 更新 `samples/`：`attempt-pass.json`、`attempt-fail.json`（要犯真实 Agent 最可能犯的错）、`replay.yaml`（必须编排「第 1 轮失败 → 按反馈修正 → 第 2 轮通过」闭环）。
 6. 防泄露自查（红线）：hidden 内容的任何拷贝/改写不得出现在 `work/`、`samples/`、`agent_brief`、`feedback_fail` 对外文案；工具凭证用 `${ENV:*}`，永不落任务文件。

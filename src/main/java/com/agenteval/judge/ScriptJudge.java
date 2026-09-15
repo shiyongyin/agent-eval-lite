@@ -61,10 +61,18 @@ public final class ScriptJudge {
         } catch (IOException e) {
             throw new JudgeException("创建脚本评审临时区失败", e);
         }
+        Path stdoutFile = null;
+        Path stderrFile = null;
         try {
+            // stdout/stderr 落到临时文件而不是管道读取：管道 readAllBytes 会阻塞到脚本自然结束，
+            // 使 waitFor(timeout) 形同虚设；落盘后才能真正按预算强杀超时脚本。放在 ephemeral 之外，
+            // 脚本看到的 AEL_WORKSPACE 仍是纯净的 workspace 副本。
+            stdoutFile = Files.createTempFile("ael-script-stdout-", ".txt");
+            stderrFile = Files.createTempFile("ael-script-stderr-", ".txt");
             ProcessBuilder builder = new ProcessBuilder("/bin/sh", script.toAbsolutePath().toString())
                     .directory(ephemeral.toFile())
-                    .redirectErrorStream(false);
+                    .redirectOutput(stdoutFile.toFile())
+                    .redirectError(stderrFile.toFile());
             builder.environment().put("AEL_SUBMISSION", input.submissionFile().toAbsolutePath().toString());
             builder.environment().put("AEL_WORKSPACE", ephemeral.toAbsolutePath().toString());
             builder.environment().put("AEL_HIDDEN", input.hiddenDir().toAbsolutePath().toString());
@@ -76,8 +84,7 @@ public final class ScriptJudge {
 
             int timeout = input.taskSpec().judge().scriptTimeoutSeconds();
             Process process = builder.start();
-            byte[] stdout = process.getInputStream().readAllBytes();
-            byte[] stderr = process.getErrorStream().readAllBytes();
+            process.getOutputStream().close();
             boolean finished = process.waitFor(timeout, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
@@ -85,9 +92,9 @@ public final class ScriptJudge {
             }
             if (process.exitValue() != 0) {
                 throw new JudgeException("评分脚本退出码 " + process.exitValue() + ": "
-                        + new String(stderr, StandardCharsets.UTF_8));
+                        + Files.readString(stderrFile, StandardCharsets.UTF_8));
             }
-            return parseChecks(new String(stdout, StandardCharsets.UTF_8), dimensionNames, scriptRel);
+            return parseChecks(Files.readString(stdoutFile, StandardCharsets.UTF_8), dimensionNames, scriptRel);
         } catch (IOException e) {
             throw new JudgeException("评分脚本执行失败: " + scriptRel, e);
         } catch (InterruptedException e) {
@@ -95,6 +102,19 @@ public final class ScriptJudge {
             throw new JudgeException("评分脚本被中断: " + scriptRel, e);
         } finally {
             Dirs.deleteTree(ephemeral);
+            deleteQuietly(stdoutFile);
+            deleteQuietly(stderrFile);
+        }
+    }
+
+    private static void deleteQuietly(Path file) {
+        if (file == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(file);
+        } catch (IOException ignored) {
+            // 临时输出文件残留不影响判分结论。
         }
     }
 
