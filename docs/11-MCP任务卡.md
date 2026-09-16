@@ -2,6 +2,7 @@
 
 > 设计依据：[docs/10-MCP环境适配器设计.md](10-MCP环境适配器设计.md)
 > 卡片目录：[docs/tasks/](tasks/)，`TASK-MCP-00…10`，frontmatter 含 `dependsOn` / `risk` / `status` / `dodCommands`，兼容 `delivery` skill 的任务卡协议。
+> 执行提示词：把 [docs/12-任务卡执行提示词.md](12-任务卡执行提示词.md) 的正文替换 `{{CARD_ID}}` 后整段交给 AI 助手。
 > 执行约定：合约（01）冻结后只实现不改；任何卡要动评测内核（SubmissionManager / JudgeRunner / FeedbackPolicy / RulesJudge 判分逻辑）视为设计错误，回 `docs/10` 重评。
 
 ## 卡片一览
