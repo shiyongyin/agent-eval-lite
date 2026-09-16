@@ -16,6 +16,7 @@ AI 进入仓库时只读本文件。命中具体任务后，只加载下表命�
 | 分析 run/suite/history 结果 | `.agents/skills/ael-analyze-results/SKILL.md` |
 | 选择验证命令 | `.agents/skills/ael-verify/SKILL.md` |
 | 红队攻防 | `redteam/AGENTS.md` |
+| 实施 MCP 环境适配器（`TASK-MCP-*`） | `docs/10-MCP环境适配器设计.md`（合约与硬约束）+ `docs/11-MCP任务卡.md` + 对应 `docs/tasks/TASK-MCP-NN.md` |
 | 理解设计背景 | `README.md`；必要时再读 `docs/03-AgentEval-Lite-设计方案.md` / `docs/04-成熟评估框架调研与ROI报告.md` |
 
 ## 小团队 + AI 辅助默认路径

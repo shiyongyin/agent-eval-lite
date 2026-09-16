@@ -360,6 +360,8 @@ bin/agent-eval export --run runs/xxx/run_yyy
 - [docs/07-任务质量清单.md](docs/07-任务质量清单.md)：任务进入 smoke/regression 前的质量审查标准。
 - [docs/08-投入使用路线设计.md](docs/08-投入使用路线设计.md)：从“可用”到“在用”的优先级、各项设计与边界。
 - [docs/09-投入使用任务卡.md](docs/09-投入使用任务卡.md)：任务卡索引；单卡在 [docs/tasks/](docs/tasks/)（TASK-USE-00…09），含 dependsOn、涉及文件、DoD 与 dodCommands。
+- [docs/10-MCP环境适配器设计.md](docs/10-MCP环境适配器设计.md)：把任务环境作为 MCP server 暴露给被测 Agent 的整体设计（控制反转、工具面合约、可信链、v1/v2 划分）。
+- [docs/11-MCP任务卡.md](docs/11-MCP任务卡.md)：MCP 适配器任务卡索引（TASK-MCP-00…10）与执行顺序。
 - [AGENTS.md](AGENTS.md)：AI 协作入口、架构分区、验证阶梯和安全红线。
 - [docs/CODEMAP.md](docs/CODEMAP.md)：由源码生成的类级地图，CI 会检查漂移。
 - [docs/PLAYBOOK.md](docs/PLAYBOOK.md)：新增 check、CLI、Agent adapter、任务、trace 事件等常见改造 recipe。
