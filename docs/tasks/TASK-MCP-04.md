@@ -71,6 +71,13 @@ dodCommands:
   7. write 到符号链接 → INVALID_PATH，链接目标未变
   8. call_tool 白名单外 → TOOL_NOT_ALLOWED；白名单内（用 `tasks/tool-call-001` 的 mock 应答库）→ 返回 call_id 且 trace 有签名 `tool_call`
   9. 每次 workspace_* 调用后 trace 末条为 `agent_action`，payload 无 `content` 键
+  10. inputSchema 校验对 7 个工具逐个生效：多余字段（`additionalProperties`）、缺必填、类型错 → `INVALID_ARGUMENT`，且**不**产生 `agent_action`（校验失败发生在动作之前）
+  11. list 传文件路径 → `INVALID_ARGUMENT`；list 不存在目录 → `NOT_FOUND`；list 含外指符号链接的目录 → 该项被跳过、其余正常
+  12. read `offset >= size` → `content==""`、`truncated:false`；`offset+limit` 恰好等于 size → `truncated:false`
+  13. write `append` 到不存在文件 → 创建；连续两次 append 内容拼接、sha256 为最终内容
+  14. 并发：8 线程各写不同文件 + 8 线程读同一文件，无异常、写结果完整、trace seq 连续
+  15. Unicode 文件名（`docs/说明.md`）读写正常
+  16. `call_tool` 的 `input` 不是 object → `INVALID_ARGUMENT`；网关返回 `success:false`（mock 库无匹配）时 payload `success:false, error` 非空，`agent_action` 不记（由 `tool_call` 事件承载）
 - `TraceLoggerTest` / `OtlpTraceExporterTest`：新事件 schema 与导出
 - `McpEnvironmentRunTest`：DoD-8
 

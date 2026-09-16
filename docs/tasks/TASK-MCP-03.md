@@ -64,7 +64,20 @@ dodCommands:
 - 配置项：无新增；Codex 侧 `[mcp_servers.ael] command="…/bin/agent-eval" args=["mcp-serve","--task","…"]`
 
 ## 9. 测试策略
-- 最小集：`McpStdioProtocolTest`（6 条断言）、`McpEnvironmentRunTest`（1 条主链）
+- `McpStdioProtocolTest`（每条一个 `@Test`，共用一个已启动的 `mcp-serve` 子进程夹具）：
+  1. stdout 每行都是合法 JSON 且 `jsonrpc=="2.0"`；运行期间 server 侧 `log.info` 至少触发一次（run 启动日志），stdout 仍无非协议行
+  2. `initialize`：响应含 `protocolVersion`（在支持列表内）、`serverInfo.name=="agent-eval-lite"`、`capabilities.tools`
+  3. `initialize` 请求带不支持的 `protocolVersion`（如 `"1999-01-01"`）→ 响应回 server 最新支持版本，不报错
+  4. 未发 `notifications/initialized` 即 `tools/call get_task` → error `-32600`
+  5. 非法 JSON 帧（`{not json`）→ error `-32700`，随后 `ping` 仍正常响应（会话未死）
+  6. 未知 method（`foo/bar`）→ `-32601`；`tools/call` 未知工具名 → `-32602`
+  7. `tools/list` 与 `src/test/resources/mcp/tools-list.snapshot.json` 一致
+  8. 线程模型：发 `submit`（合法提交）后立即发 `ping`，`ping` 响应先于 `submit` 响应到达
+  9. 大帧：`submit` 携带 ~900 KiB 的合法信封（`summary` 填长字符串）→ 正常受理；~1.1 MiB → `isError` + `TOO_LARGE`
+  10. `notifications/cancelled` → 无响应帧，stderr 有记录，会话继续
+  11. 关闭 stdin → 进程 10 s 内退出、退出码 0；run 目录 `report.json.run.status_reason=="agent_exhausted"`
+  12. `--task` 指向不存在目录 → 进程立即退出码 1，stdout 为空（错误只在 stderr）
+- `McpEnvironmentRunTest`（官方 SDK client）：DoD-7 主链 1 条 + "`pending` 路径"1 条（用 `-Dael.mcp.pendingMillis=1` 系统属性把阈值压到最小，断言先收到 `pending:true` 再经 `get_feedback` 取到反馈）
 - 推荐回归：`mvn -q verify`
 
 ## 10. 验收标准

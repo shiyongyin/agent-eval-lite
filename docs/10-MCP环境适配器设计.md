@@ -237,7 +237,7 @@ stdio 传输下任何写到 stdout 的非 JSON-RPC 字节都会毁掉会话。�
 | 单元 | `WorkspacePathGuardTest`（穿越/绝对/符号链接/大小）、`EnvironmentToolsTest`（7 个工具纯函数：正常、错误码、状态机非法调用） |
 | 集成 | `McpEnvironmentRunTest`：官方 SDK client 经 stdio 拉起 `mcp-serve` 子进程，跑 api-payload-001 fail→pass、tool-call-001 真实工具留痕、超时无提交、client 断开 → agent_exhausted |
 | 协议 | stdout 帧合法性断言；`tools/list` 输出与合约文档一致（schema 快照测试） |
-| 红队 | M1 `../hidden` 读；M2 绝对路径读；M3 workspace 内符号链接指向 hidden；M4 伪造 attempt_id/task_id 提交；M5 越权 `call_tool`（复用 G 断言）；M6 超大写入；M7 `workspace_write inbox/attempt_001.json`（落在 workspace/inbox，不算提交，run 记无提交轮）；M8 写入指向 hidden 的已存在符号链接（应拒写） |
+| 红队 | M1 `../hidden` 读；M2 绝对路径读；M3 workspace 内符号链接指向 hidden；M4 伪造 attempt_id/task_id 提交；M5 越权 `call_tool`（复用 G 断言）；M6 超大写入；M7 `workspace_write inbox/attempt_001.json`（落在 workspace/inbox，不算提交，run 记无提交轮）；M8 写入指向 hidden 的已存在符号链接（应拒写）；M9 超大 submit（TOO_LARGE 且状态不被污染） |
 | 真实 client | Codex CLI `mcp_servers` 配置只挂评测 server，`--sandbox read-only` 让它没有写文件系统能力，跑 api-payload-001；记录到 `docs/10` 附录 |
 | 全量 | `bash bin/ci-smoke.sh`；`mvn verify` 覆盖率不低于现状 |
 

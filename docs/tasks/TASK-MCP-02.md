@@ -91,6 +91,11 @@ dodCommands:
   4. `close()` → run 以 `agent_exhausted` 结束，`onRunFinished` 被调用
   5. 响应只完成一次：末轮 `onAttemptJudged` 与 `onRunFinished` 都到达，client 只收到一个含 `run_finished:true` 且含分数的响应
   6. trace 完整性：`report.json` 无 `trace_integrity_broken`，`traces/trace.jsonl` seq 连续
+  7. 判分故障终态：用 `TestSpecs` 造 `judge.type=script` 且脚本 `exit 3` 的任务；client `submit` 后收到唯一响应 `run_finished:true, status:ERROR`，无 `score`；run 目录 `report.json.run.status==ERROR`
+  8. 完整性熔断终态：`submit` 前测试线程改写 `hidden/judge.rules.yaml`；响应 `run_finished:true, status:INTEGRITY_BROKEN`；`onRunFinished` 被调用恰一次
+  9. 超时后下一轮：场景 3 超时后再调 `get_task` 快照 `attempt_id==attempt_002`、`state==WAITING_SUBMIT`
+  10. 单轮任务（`allow_multi_submit=false`）：首轮未过 → 响应 `run_finished:true, status:FAILED`，无 `next_attempt_id`
+  11. 资源回收：run 结束后适配器内部线程池 / Future 全部完成，`gate.state()==CLOSED`（用 `awaitTermination` 断言）
 - `InstructionsRendererChannelTest`：`MCP_TOOL` 渲染结果不含 `inbox/`、不含 `agent-eval tool call`、含 `submit`、含 `workspace_read`；`FILE` 渲染与改动前逐字相同（先在改动前抓一份快照到 `src/test/resources/instructions/api-payload-001.file.md`）
 - `FeedbackPolicyTest`：新增 `MCP_TOOL` 通道 `next_step` 断言；既有用例不改
 
